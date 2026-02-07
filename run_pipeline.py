@@ -12,6 +12,8 @@ import logging
 import sys
 from pathlib import Path
 
+import pandas as pd
+
 from src.io import load_run
 from src.alignment import align_runs
 from src.matching import match_anomalies, DEFAULT_DIST_TOL, DEFAULT_CLOCK_TOL, DEFAULT_COST_THRESH
@@ -82,6 +84,26 @@ Examples:
     # Output
     p.add_argument("--output_dir", "-o", default="outputs",
                    help="Output directory (default: outputs/).")
+    p.add_argument("--html_report", action="store_true",
+                   help="Generate an interactive HTML report (requires plotly & jinja2).")
+
+    # Confidence scoring
+    p.add_argument("--enable_confidence", action="store_true",
+                   help="Add probabilistic and confidence scoring columns to matched output.")
+
+    # Clustering
+    p.add_argument("--clustering_epsilon", type=float, default=None,
+                   help="DBSCAN epsilon (ft) for anomaly clustering. Omit to skip clustering.")
+    p.add_argument("--clustering_mode", choices=["1d", "2d"], default="1d",
+                   help="Clustering mode: 1d (distance only) or 2d (distance + clock). Default: 1d.")
+
+    # Multi-run
+    p.add_argument("--enable_multirun", action="store_true",
+                   help="Enable multi-run tracking across 3+ runs.")
+    p.add_argument("--runs", default=None,
+                   help="Comma-separated sheet names for multi-run (e.g. 2007,2015,2022).")
+    p.add_argument("--run_years", default=None,
+                   help="Comma-separated year gaps between consecutive runs (e.g. 8,7).")
 
     # Verbosity
     p.add_argument("--verbose", "-v", action="store_true", help="Enable debug logging.")
@@ -127,6 +149,31 @@ def main(argv=None):
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    # --- Multi-run mode ---
+    if args.enable_multirun and args.runs:
+        from src.multirun import run_multirun_pipeline
+        sheets = [_parse_sheet(s.strip()) for s in args.runs.split(",")]
+        run_specs = [{"sheet": s, "run_id": str(s)} for s in sheets]
+
+        if args.run_years:
+            years_list = [float(y.strip()) for y in args.run_years.split(",")]
+        else:
+            years_list = [args.years] * (len(sheets) - 1)
+
+        log.info("Multi-run mode: %s", " -> ".join(str(s) for s in sheets))
+        tracks = run_multirun_pipeline(
+            file_path=file_a,
+            run_specs=run_specs,
+            years_between=years_list,
+            dist_tol=args.dist_tol,
+            clock_tol=args.clock_tol,
+            cost_thresh=args.cost_thresh,
+            output_dir=str(output_dir),
+        )
+        print(f"\nMulti-run pipeline complete: {len(tracks)} tracks across {len(sheets)} runs")
+        print(f"  Outputs written to: {output_dir}/")
+        return 0
+
     # --- Load ---
     log.info("Loading Run A: %s (sheet=%s)", file_a, sheet_a)
     df_a, info_a = load_run(file_a, run_id_a, sheet_name=sheet_a)
@@ -144,6 +191,7 @@ def main(argv=None):
         dist_tol=args.dist_tol,
         clock_tol=args.clock_tol,
         cost_thresh=args.cost_thresh,
+        enable_confidence=args.enable_confidence,
     )
 
     # --- Growth ---
@@ -154,6 +202,14 @@ def main(argv=None):
         critical_depth_pct=args.critical_depth,
         forecast_years=args.forecast_years,
     )
+
+    # --- Clustering (optional) ---
+    if args.clustering_epsilon is not None:
+        from src.clustering import cluster_anomalies, compute_cluster_metrics, write_clusters_summary
+        log.info("Clustering anomalies (eps=%.1f, mode=%s)...", args.clustering_epsilon, args.clustering_mode)
+        growth_df = cluster_anomalies(growth_df, epsilon=args.clustering_epsilon, mode=args.clustering_mode)
+        cluster_metrics = compute_cluster_metrics(growth_df)
+        write_clusters_summary(cluster_metrics, output_dir / "clusters_summary.csv")
 
     # --- Output ---
     log.info("Writing outputs to %s/", output_dir)
@@ -169,22 +225,62 @@ def main(argv=None):
         run_id_b=run_id_b,
         years_between=args.years,
         output_dir=output_dir,
+        html_report=args.html_report,
     )
 
     # --- Final summary ---
+    n_a = len(df_a)
+    n_b = len(df_b)
     n_matched = len(growth_df)
     n_missing = len(missing_df)
     n_new = len(new_df)
-    print(f"\nPipeline complete:")
-    print(f"  Matched anomalies:  {n_matched}")
+    n_uncertain = int((growth_df["status"] == "UNCERTAIN").sum()) if not growth_df.empty and "status" in growth_df.columns else 0
+
+    print(f"\n{'='*60}")
+    print(f"  Pipeline Complete — {run_id_a} vs {run_id_b}")
+    print(f"{'='*60}")
+    print(f"  Run A features:       {n_a}")
+    print(f"  Run B features:       {n_b}")
+    print(f"  Matched anomalies:    {n_matched}  ({n_matched - n_uncertain} confident, {n_uncertain} uncertain)")
     print(f"  Missing (Run A only): {n_missing}")
     print(f"  New (Run B only):     {n_new}")
+
     if not growth_df.empty and "depth_growth_pct_per_yr" in growth_df.columns:
         valid = growth_df["depth_growth_pct_per_yr"].dropna()
         if len(valid):
-            print(f"  Mean growth rate:   {valid.mean():.3f} %WT/yr")
-            print(f"  Max growth rate:    {valid.max():.3f} %WT/yr")
-    print(f"  Outputs written to: {output_dir}/")
+            neg = (valid < 0).sum()
+            print(f"\n  Growth statistics ({args.years:.0f}-year gap):")
+            print(f"    Mean growth rate:   {valid.mean():.3f} %WT/yr")
+            print(f"    Median growth rate: {valid.median():.3f} %WT/yr")
+            print(f"    Max growth rate:    {valid.max():.3f} %WT/yr")
+            print(f"    Negative growth:    {neg} (possible measurement error)")
+
+        # Top-10 fastest-growing anomalies
+        if "severity_score" in growth_df.columns:
+            top = growth_df.head(10)
+            cols_show = ["feature_id_a", "feature_type", "distance_a",
+                         "depth_pct_b", "depth_growth_pct_per_yr",
+                         "remaining_life_yr", "severity_score"]
+            available = [c for c in cols_show if c in top.columns]
+            if available:
+                print(f"\n  Top-10 most severe anomalies:")
+                print(f"  {'Rank':<5} {'Feature ID':<12} {'Type':<16} {'Dist(ft)':<10} "
+                      f"{'Depth%':<8} {'Growth/yr':<10} {'Life(yr)':<10} {'Score':<6}")
+                print(f"  {'-'*77}")
+                for rank, (_, row) in enumerate(top.iterrows(), 1):
+                    fid = row.get("feature_id_a", "?")
+                    ftype = str(row.get("feature_type", "?"))[:15]
+                    dist = row.get("distance_a", float("nan"))
+                    depth = row.get("depth_pct_b", float("nan"))
+                    gr = row.get("depth_growth_pct_per_yr", float("nan"))
+                    life = row.get("remaining_life_yr", float("nan"))
+                    sev = row.get("severity_score", float("nan"))
+                    life_s = f"{life:.1f}" if life != float("inf") and pd.notna(life) else "inf"
+                    print(f"  {rank:<5} {str(fid):<12} {ftype:<16} {dist:<10.1f} "
+                          f"{depth:<8.1f} {gr:<10.3f} {life_s:<10} {sev:<6.1f}")
+
+    print(f"\n  Outputs written to: {output_dir}/")
+    print(f"{'='*60}")
 
     return 0
 
