@@ -1,0 +1,68 @@
+# Pipeline ILI Data Alignment and Corrosion Growth Analysis
+
+## Overview
+A Python program for pipeline In-Line Inspection (ILI) data alignment and corrosion growth analysis. The program reads two ILI run datasets (CSV files) for the same pipeline segment, aligns them by distance, matches anomalies between runs, computes corrosion growth rates, and outputs results.
+
+## Current State
+An MVP implementation exists in `ili_alignment.py` with sample data files (`sample_run1.csv`, `sample_run2.csv`). The MVP supports:
+- CSV loading with column validation
+- Constant-offset distance alignment using weld references
+- Greedy one-to-one anomaly matching by distance, clock position, orientation, and feature type
+- Depth, length, and width growth rate calculations
+- CSV output of matched/unmatched anomalies
+
+## Requirements
+
+### 1. Data Input (Existing - Needs Enhancement)
+- Read two ILI run CSV datasets with fields: feature_id, distance, clock_position, feature_type, orientation, depth_percent, length, width, wall_thickness
+- Handle missing optional fields gracefully
+- Support additional input formats beyond CSV (e.g., Excel .xlsx)
+- Add data validation and cleaning (duplicate feature_ids, out-of-range values, negative depths)
+
+### 2. Distance Alignment (Existing - Needs Enhancement)
+- Current: constant offset using first weld reference
+- Add multi-point alignment using multiple weld/reference features
+- Implement piecewise linear interpolation between reference points to handle stretch/compression
+- Add stretch factor calculation when multiple reference points are available
+- Allow user-provided reference point mapping file
+
+### 3. Anomaly Matching (Existing - Needs Enhancement)
+- Current: greedy matching with distance + clock thresholds
+- Implement Hungarian algorithm (optimal assignment) as alternative to greedy
+- Add configurable weighting for distance vs clock vs depth similarity
+- Support many-to-one matching (anomaly coalescence detection)
+- Add match confidence scoring (high/medium/low based on proximity)
+- Handle edge case: features at pipeline start/end wrapping
+
+### 4. Growth Rate Calculation (Existing - Needs Enhancement)
+- Current: linear depth/length/width growth per year
+- Add remaining wall thickness and safe operating pressure calculations (ASME B31G / RSTRENG)
+- Calculate estimated time to failure based on growth rate and critical depth threshold
+- Flag anomalies with growth rates exceeding configurable thresholds
+- Support non-linear growth models (if historical data from 3+ runs is available)
+- Calculate ERF (Estimated Repair Factor) for each anomaly
+
+### 5. Output and Reporting (Existing - Needs Enhancement)
+- Current: three CSV output files
+- Generate summary statistics report (mean/median/max growth rates by feature type, by pipeline segment)
+- Add HTML or PDF report generation with charts (depth growth distribution, worst-N anomalies)
+- Include a dig-list: anomalies ranked by severity/growth that need field verification
+- Export matched results in pipeline operator standard formats
+
+### 6. Testing
+- Write unit tests for clock_to_degrees, angular_difference, normalise_orientation
+- Write unit tests for alignment offset computation
+- Write integration tests with known sample data and expected matching results
+- Add edge case tests: empty runs, single anomaly, all unmatched, identical runs
+
+### 7. CLI and Configuration
+- Current: argparse CLI with basic options
+- Add a YAML/JSON configuration file for default parameters
+- Add --verbose / --quiet logging levels
+- Add --dry-run mode that shows alignment and matching without writing files
+- Add interactive mode for reviewing and confirming matches
+
+### 8. Documentation
+- Add docstrings to all public functions
+- Write a README with usage examples, input format specification, and output field descriptions
+- Include example workflow with sample data

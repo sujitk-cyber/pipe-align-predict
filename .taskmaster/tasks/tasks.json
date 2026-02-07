@@ -1,0 +1,822 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Enhance Data Input and Validation",
+        "description": "Extend existing CSV loading to support Excel files and implement comprehensive data validation and cleaning",
+        "details": "Enhance the existing data loading functionality to support Excel (.xlsx) files using pandas.read_excel(). Implement data validation for: duplicate feature_ids (remove or flag), out-of-range clock positions (0-360 degrees), negative depth values, missing required fields. Add graceful handling of optional fields with default values. Use pandas for robust data type validation and cleaning. Example: df = pd.read_excel(file) if file.endswith('.xlsx') else pd.read_csv(file); df = df.drop_duplicates(subset=['feature_id']); df = df[df['depth_percent'] >= 0]",
+        "testStrategy": "Unit tests with malformed CSV/Excel files, duplicate IDs, negative values, missing columns. Verify graceful error handling and data cleaning results.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement Excel file format support",
+            "description": "Extend existing CSV loading functionality to support Excel (.xlsx) files using pandas.read_excel()",
+            "dependencies": [],
+            "details": "Modify the data loading function to detect file extensions and use appropriate pandas method. Implement file type detection: df = pd.read_excel(file) if file.endswith('.xlsx') else pd.read_csv(file). Add error handling for corrupted Excel files and unsupported formats.",
+            "status": "pending",
+            "testStrategy": "Unit tests with valid Excel files, corrupted files, and mixed file types. Verify proper pandas method selection and error handling."
+          },
+          {
+            "id": 2,
+            "title": "Implement duplicate feature_id validation and removal",
+            "description": "Add validation to detect and handle duplicate feature_ids in the dataset",
+            "dependencies": [
+              1
+            ],
+            "details": "Use pandas drop_duplicates method to remove duplicate entries based on feature_id column. Implement logging to track removed duplicates: df = df.drop_duplicates(subset=['feature_id'], keep='first'). Add option to flag duplicates instead of removing them.",
+            "status": "pending",
+            "testStrategy": "Test with datasets containing duplicate feature_ids. Verify correct removal/flagging and logging of duplicate entries."
+          },
+          {
+            "id": 3,
+            "title": "Implement data range validation for clock positions and depth values",
+            "description": "Add validation for clock positions (0-360 degrees) and negative depth values",
+            "dependencies": [
+              2
+            ],
+            "details": "Implement range checks: filter clock positions to 0-360 degrees, remove negative depth values using df = df[df['depth_percent'] >= 0]. Add validation for clock position bounds: df = df[(df['clock_position'] >= 0) & (df['clock_position'] <= 360)]. Log invalid entries before removal.",
+            "status": "pending",
+            "testStrategy": "Test with out-of-range clock positions, negative depths, and boundary values. Verify proper filtering and logging of invalid data."
+          },
+          {
+            "id": 4,
+            "title": "Implement missing required fields validation",
+            "description": "Add validation to check for missing required fields and handle them appropriately",
+            "dependencies": [
+              3
+            ],
+            "details": "Define required fields list and check for missing values using pandas.isnull(). Implement validation: required_fields = ['feature_id', 'depth_percent', 'clock_position']; df.dropna(subset=required_fields). Add detailed error reporting for missing data with row numbers and field names.",
+            "status": "pending",
+            "testStrategy": "Test with datasets missing required fields. Verify proper error reporting and data filtering for incomplete records."
+          },
+          {
+            "id": 5,
+            "title": "Implement graceful handling of optional fields with default values",
+            "description": "Add support for optional fields with configurable default values and robust data type validation",
+            "dependencies": [
+              4
+            ],
+            "details": "Use pandas fillna() for optional fields with defaults. Implement data type validation using pandas.to_numeric() and pandas.to_datetime() with error handling. Example: df['optional_field'] = df['optional_field'].fillna(default_value); df['numeric_field'] = pd.to_numeric(df['numeric_field'], errors='coerce'). Add configuration for default values.",
+            "status": "pending",
+            "testStrategy": "Test with missing optional fields and invalid data types. Verify default value assignment and type conversion with error handling."
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Implement Multi-Point Distance Alignment",
+        "description": "Replace constant offset alignment with multi-point alignment using multiple reference features and piecewise linear interpolation",
+        "details": "Extend beyond single weld reference to use multiple reference points (welds, valves, fittings). Implement piecewise linear interpolation using scipy.interpolate.interp1d between reference points to handle pipeline stretch/compression. Calculate stretch factors between segments. Support user-provided reference mapping file (CSV with run1_distance, run2_distance, reference_type). Example: from scipy.interpolate import interp1d; alignment_func = interp1d(run1_refs, run2_refs, kind='linear', fill_value='extrapolate')",
+        "testStrategy": "Test with synthetic data having known stretch factors. Verify interpolation accuracy between reference points. Test edge cases with single reference point falling back to constant offset.",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement Reference Point Data Structure and CSV Parser",
+            "description": "Create data structures to handle multiple reference points and implement CSV file parser for reference mapping",
+            "dependencies": [],
+            "details": "Define ReferencePoint class with distance, reference_type, and metadata fields. Implement CSV parser to read user-provided reference mapping files with columns: run1_distance, run2_distance, reference_type. Add validation for required columns and data types. Handle missing values and duplicate entries with appropriate error messages.",
+            "status": "pending",
+            "testStrategy": "Test CSV parsing with valid and invalid files. Verify data structure creation and validation logic with edge cases like missing columns or malformed data."
+          },
+          {
+            "id": 2,
+            "title": "Implement Piecewise Linear Interpolation Function",
+            "description": "Create interpolation function using scipy.interpolate.interp1d for distance alignment between reference points",
+            "dependencies": [
+              1
+            ],
+            "details": "Use scipy.interpolate.interp1d to create alignment function from reference points. Implement linear interpolation with extrapolation support for points outside reference range. Handle edge cases with single reference point by falling back to constant offset. Add error handling for insufficient reference points or invalid data ranges.",
+            "status": "pending",
+            "testStrategy": "Test interpolation accuracy with known reference points. Verify extrapolation behavior at pipeline boundaries. Test fallback to constant offset with single reference point."
+          },
+          {
+            "id": 3,
+            "title": "Calculate Stretch Factors Between Pipeline Segments",
+            "description": "Implement stretch factor calculation between consecutive reference points to quantify pipeline deformation",
+            "dependencies": [
+              2
+            ],
+            "details": "Calculate stretch factors as ratio of distance differences between consecutive reference points in run1 vs run2. Store stretch factors per segment for analysis and reporting. Handle segments with compression (stretch < 1.0) and expansion (stretch > 1.0). Add validation to detect unrealistic stretch factors that may indicate data errors.",
+            "status": "pending",
+            "testStrategy": "Test stretch factor calculations with synthetic data having known deformation. Verify detection of compression and expansion segments. Test validation logic for unrealistic stretch values."
+          },
+          {
+            "id": 4,
+            "title": "Integrate Multi-Point Alignment with Feature Matching",
+            "description": "Replace existing constant offset alignment with multi-point interpolation in the feature matching pipeline",
+            "dependencies": [
+              3
+            ],
+            "details": "Modify existing alignment logic to use interpolation function instead of constant offset. Apply distance transformation to all features before matching. Ensure backward compatibility by supporting both alignment methods through configuration. Update distance calculations in matching algorithms to use aligned distances.",
+            "status": "pending",
+            "testStrategy": "Compare matching results between constant offset and multi-point alignment methods. Test with real pipeline data to verify improved alignment accuracy. Validate backward compatibility with existing configurations."
+          },
+          {
+            "id": 5,
+            "title": "Add Configuration and Error Handling for Multi-Point Alignment",
+            "description": "Implement configuration options and comprehensive error handling for the multi-point alignment system",
+            "dependencies": [
+              4
+            ],
+            "details": "Add configuration parameters for interpolation method, extrapolation behavior, and stretch factor validation thresholds. Implement comprehensive error handling for missing reference files, invalid data formats, and interpolation failures. Add logging for alignment process steps and warnings for potential data quality issues. Create fallback mechanisms when multi-point alignment fails.",
+            "status": "pending",
+            "testStrategy": "Test configuration parameter effects on alignment behavior. Verify error handling with various failure scenarios. Test fallback mechanisms and logging output quality."
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Implement Hungarian Algorithm for Optimal Matching",
+        "description": "Add Hungarian algorithm as an alternative to greedy matching for optimal anomaly assignment",
+        "details": "Implement Hungarian algorithm using scipy.optimize.linear_sum_assignment for optimal one-to-one matching. Create cost matrix based on weighted distance, clock position, and depth similarity. Add configurable weights for different matching criteria. Include match confidence scoring (high: cost < 0.3, medium: 0.3-0.7, low: >0.7). Example: from scipy.optimize import linear_sum_assignment; cost_matrix = calculate_cost_matrix(run1_features, run2_features, weights); row_ind, col_ind = linear_sum_assignment(cost_matrix)",
+        "testStrategy": "Compare Hungarian vs greedy results on sample data. Test with different weight configurations. Verify optimal assignment properties and confidence scoring accuracy.",
+        "priority": "medium",
+        "dependencies": [
+          2
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement cost matrix calculation function",
+            "description": "Create function to calculate cost matrix based on weighted distance, clock position, and depth similarity between anomalies from two runs",
+            "dependencies": [],
+            "details": "Implement calculate_cost_matrix function that takes run1_features, run2_features, and weights as parameters. Calculate normalized distance differences, clock position differences (handling wraparound), and depth similarity scores. Combine using configurable weights for each criterion. Return numpy array cost matrix suitable for Hungarian algorithm.",
+            "status": "pending",
+            "testStrategy": "Unit test with sample feature data. Verify cost matrix dimensions match input features. Test weight parameter effects on cost calculations."
+          },
+          {
+            "id": 2,
+            "title": "Integrate scipy Hungarian algorithm implementation",
+            "description": "Implement Hungarian algorithm wrapper using scipy.optimize.linear_sum_assignment for optimal one-to-one matching",
+            "dependencies": [
+              1
+            ],
+            "details": "Create hungarian_matching function that uses scipy.optimize.linear_sum_assignment with cost matrix from subtask 1. Handle edge cases where number of anomalies differs between runs. Return matched pairs as (run1_index, run2_index) tuples along with total assignment cost.",
+            "status": "pending",
+            "testStrategy": "Test with various sized input arrays. Verify optimal assignment properties. Compare results against known optimal solutions for small test cases."
+          },
+          {
+            "id": 3,
+            "title": "Implement configurable weight system",
+            "description": "Add configuration system for adjustable weights for distance, clock position, and depth similarity matching criteria",
+            "dependencies": [],
+            "details": "Create WeightConfig class or dictionary structure to store weights for distance_weight, clock_weight, and depth_weight parameters. Add validation to ensure weights sum to 1.0 or are properly normalized. Integrate with cost matrix calculation to allow runtime weight adjustment.",
+            "status": "pending",
+            "testStrategy": "Test weight normalization and validation. Verify different weight combinations produce expected cost matrix variations. Test edge cases with zero weights."
+          },
+          {
+            "id": 4,
+            "title": "Implement match confidence scoring system",
+            "description": "Add confidence scoring based on assignment costs with high/medium/low thresholds at 0.3 and 0.7",
+            "dependencies": [
+              2
+            ],
+            "details": "Create confidence scoring function that categorizes matches based on normalized assignment costs. High confidence for cost < 0.3, medium for 0.3-0.7, low for >0.7. Add confidence score to match results. Include statistical summary of confidence distribution across all matches.",
+            "status": "pending",
+            "testStrategy": "Verify confidence thresholds work correctly. Test with known good/poor matches. Validate confidence distribution statistics calculation."
+          },
+          {
+            "id": 5,
+            "title": "Create Hungarian algorithm interface and comparison utilities",
+            "description": "Build main interface function and comparison utilities to evaluate Hungarian vs greedy matching performance",
+            "dependencies": [
+              2,
+              3,
+              4
+            ],
+            "details": "Create main hungarian_match_anomalies function that combines all components. Add comparison utilities to evaluate Hungarian vs greedy results including total cost, match quality metrics, and performance timing. Include option to run both algorithms and compare results side-by-side.",
+            "status": "pending",
+            "testStrategy": "Compare Hungarian vs greedy results on sample datasets. Verify Hungarian produces lower total cost. Test performance with different dataset sizes and weight configurations."
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Add Advanced Matching Features",
+        "description": "Implement many-to-one matching for coalescence detection and handle pipeline wrapping edge cases",
+        "details": "Extend matching to support many-to-one scenarios where multiple run1 anomalies match to single run2 anomaly (coalescence). Implement pipeline wrapping logic for features near start/end (distance 0 and max_distance). Add configurable coalescence detection threshold. Use networkx or custom graph algorithms for complex matching scenarios. Example: if abs(distance1 - distance2) > (pipeline_length * 0.9): wrapped_distance = min(distance1, distance2) + (pipeline_length - max(distance1, distance2))",
+        "testStrategy": "Test coalescence scenarios with synthetic data. Verify wrapping logic with features at pipeline boundaries. Test edge cases with multiple coalescence candidates.",
+        "priority": "medium",
+        "dependencies": [
+          3
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement Pipeline Wrapping Distance Calculation",
+            "description": "Create function to calculate wrapped distances for features near pipeline start/end boundaries",
+            "dependencies": [],
+            "details": "Implement wrapped distance calculation logic for features at pipeline boundaries (distance 0 and max_distance). Use formula: if abs(distance1 - distance2) > (pipeline_length * 0.9): wrapped_distance = min(distance1, distance2) + (pipeline_length - max(distance1, distance2)). Create utility function that takes two distances and pipeline length as parameters.",
+            "status": "pending",
+            "testStrategy": "Test with features at boundaries (0, max_distance) and verify wrapped distance calculations are correct"
+          },
+          {
+            "id": 2,
+            "title": "Add Configurable Coalescence Detection Threshold",
+            "description": "Implement configurable threshold parameter for detecting when multiple anomalies coalesce into one",
+            "dependencies": [
+              1
+            ],
+            "details": "Add coalescence_threshold parameter to configuration. Implement logic to detect when multiple run1 anomalies should be matched to a single run2 anomaly based on proximity and similarity criteria. Use threshold to determine coalescence candidates within specified distance/depth ranges.",
+            "status": "pending",
+            "testStrategy": "Test coalescence detection with various threshold values and verify correct grouping of anomalies"
+          },
+          {
+            "id": 3,
+            "title": "Implement Graph-Based Many-to-One Matching Algorithm",
+            "description": "Create graph algorithm using networkx to handle complex many-to-one matching scenarios",
+            "dependencies": [
+              2
+            ],
+            "details": "Use networkx to create bipartite graph with run1 anomalies as one set and run2 anomalies as another. Implement weighted edges based on distance, depth similarity, and feature type matching. Use maximum weight matching or custom algorithm to handle many-to-one scenarios where multiple run1 features match to single run2 feature.",
+            "status": "pending",
+            "testStrategy": "Test with synthetic data containing known coalescence scenarios and verify correct many-to-one matching results"
+          },
+          {
+            "id": 4,
+            "title": "Extend Matching Logic for Coalescence Scenarios",
+            "description": "Integrate coalescence detection and graph matching into main matching workflow",
+            "dependencies": [
+              3
+            ],
+            "details": "Modify existing matching logic to first identify coalescence candidates using threshold, then apply graph-based matching algorithm. Handle edge cases where no valid matches exist or multiple equally valid matches are found. Ensure backward compatibility with existing one-to-one matching scenarios.",
+            "status": "pending",
+            "testStrategy": "Test integration with existing matching workflow and verify coalescence scenarios are handled correctly without breaking existing functionality"
+          },
+          {
+            "id": 5,
+            "title": "Add Pipeline Boundary Edge Case Handling",
+            "description": "Implement comprehensive handling of edge cases for features at pipeline start and end boundaries",
+            "dependencies": [
+              4
+            ],
+            "details": "Handle special cases for features very close to distance 0 or max_distance. Implement logic for partial pipeline coverage scenarios. Add validation for pipeline length parameter and handle cases where pipeline length is unknown or invalid. Ensure wrapped distance calculations work correctly with coalescence detection.",
+            "status": "pending",
+            "testStrategy": "Test with features at exact boundaries (distance 0, max_distance) and verify edge cases are handled gracefully without errors"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Enhance Growth Rate Calculations",
+        "description": "Add remaining wall thickness, safe operating pressure calculations, and time-to-failure estimates using ASME B31G standards",
+        "details": "Implement ASME B31G and RSTRENG calculations for remaining strength assessment. Calculate remaining wall thickness: RWT = wall_thickness * (1 - depth_percent/100). Compute safe operating pressure using Folias factor for interacting defects. Add time-to-failure estimation: TTF = (critical_depth - current_depth) / growth_rate. Calculate ERF (Estimated Repair Factor). Flag anomalies exceeding configurable growth thresholds. Example: folias_factor = sqrt(1 + 0.6275 * (length/sqrt(diameter * wall_thickness))**2); safe_pressure = 2 * SMYS * RWT / diameter * folias_factor",
+        "testStrategy": "Validate calculations against ASME B31G examples. Test with various pipe geometries and defect sizes. Verify threshold flagging and TTF calculations.",
+        "priority": "high",
+        "dependencies": [
+          4
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement Remaining Wall Thickness (RWT) Calculations",
+            "description": "Implement the core remaining wall thickness calculation using ASME B31G standards",
+            "dependencies": [],
+            "details": "Implement RWT calculation using the formula: RWT = wall_thickness * (1 - depth_percent/100). Add input validation for wall thickness and depth percentage values. Handle edge cases where depth exceeds 100% or negative values. Create helper functions for unit conversions if needed.",
+            "status": "pending",
+            "testStrategy": "Unit tests with various wall thickness and depth combinations. Test edge cases with 0%, 50%, 80%, and 100% depth values. Verify calculation accuracy against ASME B31G examples."
+          },
+          {
+            "id": 2,
+            "title": "Implement Folias Factor and Safe Operating Pressure Calculations",
+            "description": "Calculate Folias factor for interacting defects and compute safe operating pressure",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement Folias factor calculation: folias_factor = sqrt(1 + 0.6275 * (length/sqrt(diameter * wall_thickness))**2). Calculate safe operating pressure: safe_pressure = 2 * SMYS * RWT / diameter * folias_factor. Add validation for pipe geometry parameters (diameter, length) and material properties (SMYS).",
+            "status": "pending",
+            "testStrategy": "Test with various pipe geometries and defect sizes. Validate against ASME B31G reference calculations. Test boundary conditions with very small and large defect lengths."
+          },
+          {
+            "id": 3,
+            "title": "Implement Time-to-Failure (TTF) Estimation",
+            "description": "Add time-to-failure calculations based on growth rates and critical depth thresholds",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement TTF calculation: TTF = (critical_depth - current_depth) / growth_rate. Define critical depth based on ASME B31G criteria or user-configurable thresholds. Handle cases where growth rate is zero or negative. Add units handling for time calculations (years, months, days).",
+            "status": "pending",
+            "testStrategy": "Test TTF calculations with various growth rates and current depths. Verify handling of zero/negative growth rates. Test with different critical depth thresholds and time unit conversions."
+          },
+          {
+            "id": 4,
+            "title": "Implement Estimated Repair Factor (ERF) Calculations",
+            "description": "Calculate ERF values according to ASME B31G and RSTRENG methodologies",
+            "dependencies": [
+              2
+            ],
+            "details": "Implement ERF calculation using ASME B31G methodology. Calculate the ratio of defect area to pipe cross-sectional area. Implement RSTRENG calculations as an alternative method. Add comparison between B31G and RSTRENG results. Include confidence intervals and uncertainty analysis.",
+            "status": "pending",
+            "testStrategy": "Validate ERF calculations against ASME B31G and RSTRENG reference examples. Compare results between both methodologies. Test with various defect geometries and pipe specifications."
+          },
+          {
+            "id": 5,
+            "title": "Implement Growth Threshold Monitoring and Anomaly Flagging",
+            "description": "Add configurable growth rate thresholds and automatic anomaly detection",
+            "dependencies": [
+              3,
+              4
+            ],
+            "details": "Implement configurable growth rate thresholds (e.g., mm/year limits). Create anomaly flagging system for defects exceeding thresholds. Add severity levels (low, medium, high, critical) based on growth rates and TTF values. Generate alerts and recommendations for inspection or repair actions.",
+            "status": "pending",
+            "testStrategy": "Test threshold configuration and anomaly detection with various growth rate scenarios. Verify correct severity level assignment. Test alert generation and recommendation logic with edge cases."
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Implement Advanced Reporting and Visualization",
+        "description": "Generate HTML/PDF reports with charts, summary statistics, and dig-list prioritization",
+        "details": "Use matplotlib/plotly for visualization and reportlab/weasyprint for PDF generation. Create summary statistics: mean/median/max growth rates by feature_type and pipeline segment. Generate depth growth distribution histograms, worst-N anomalies charts. Implement dig-list ranking by severity score combining growth rate, current depth, and remaining life. Export to HTML with interactive charts using plotly. Example: fig = px.histogram(df, x='depth_growth_rate', color='feature_type'); report_html = generate_html_template(summary_stats, figures, dig_list)",
+        "testStrategy": "Verify report generation with sample data. Test PDF/HTML output formatting. Validate dig-list ranking algorithm and chart accuracy.",
+        "priority": "medium",
+        "dependencies": [
+          5
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement Summary Statistics Calculation Module",
+            "description": "Create functions to calculate mean, median, and maximum growth rates grouped by feature_type and pipeline segment",
+            "dependencies": [],
+            "details": "Develop statistical analysis functions using pandas groupby operations to compute summary statistics. Calculate mean/median/max growth rates for each feature_type (e.g., metal loss, dent, crack) and pipeline segment. Include standard deviation and count metrics. Handle missing values and edge cases gracefully.",
+            "status": "pending",
+            "testStrategy": "Unit tests with sample datasets containing various feature types and segments. Verify statistical calculations against manual computations."
+          },
+          {
+            "id": 2,
+            "title": "Create Interactive Charts with Plotly",
+            "description": "Develop visualization functions for depth growth distribution histograms and worst-N anomalies charts using plotly",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement plotly-based interactive charts including histograms for depth growth rate distribution colored by feature_type, scatter plots for worst anomalies, and bar charts for summary statistics. Create reusable chart generation functions with customizable parameters for colors, titles, and data filtering.",
+            "status": "pending",
+            "testStrategy": "Visual testing with sample data to verify chart accuracy and interactivity. Test different data sizes and edge cases with empty datasets."
+          },
+          {
+            "id": 3,
+            "title": "Implement Dig-List Ranking Algorithm",
+            "description": "Create severity scoring system combining growth rate, current depth, and remaining life for dig-list prioritization",
+            "dependencies": [
+              1
+            ],
+            "details": "Develop weighted scoring algorithm that combines normalized growth rate, current depth percentage, and calculated remaining life. Implement configurable weights for each factor. Sort anomalies by severity score and generate ranked dig-list with priority levels (critical, high, medium, low).",
+            "status": "pending",
+            "testStrategy": "Test ranking algorithm with known scenarios. Verify score calculations and priority assignments. Test with different weight configurations."
+          },
+          {
+            "id": 4,
+            "title": "Build HTML Report Generation System",
+            "description": "Create HTML template system with embedded interactive plotly charts and formatted summary tables",
+            "dependencies": [
+              2,
+              3
+            ],
+            "details": "Develop HTML template engine using Jinja2 or similar to generate comprehensive reports. Embed plotly charts as interactive HTML elements. Create formatted tables for summary statistics and dig-list. Include CSS styling for professional appearance and responsive design.",
+            "status": "pending",
+            "testStrategy": "Test HTML generation with various data sets. Verify chart embedding and interactivity in browsers. Test responsive design on different screen sizes."
+          },
+          {
+            "id": 5,
+            "title": "Implement PDF Export Functionality",
+            "description": "Add PDF generation capability using reportlab or weasyprint with static charts and formatted tables",
+            "dependencies": [
+              4
+            ],
+            "details": "Implement PDF export using reportlab or weasyprint libraries. Convert interactive plotly charts to static images for PDF inclusion. Create professional PDF layout with headers, footers, page numbers, and proper formatting. Handle multi-page reports and table pagination.",
+            "status": "pending",
+            "testStrategy": "Test PDF generation with large datasets. Verify chart quality and table formatting. Test pagination and layout consistency across different report sizes."
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Add Support for Non-Linear Growth Models",
+        "description": "Implement non-linear growth modeling when 3+ historical runs are available",
+        "details": "Extend growth calculations to support exponential, polynomial, and power-law models when multiple historical runs (3+) are available. Use scipy.optimize.curve_fit for model fitting. Implement model selection based on R-squared and AIC criteria. Support growth models: linear, exponential (a*exp(b*t)), polynomial (a + b*t + c*t^2), power-law (a*t^b). Example: from scipy.optimize import curve_fit; popt, pcov = curve_fit(exponential_model, time_points, depth_values); r_squared = calculate_r_squared(actual, predicted)",
+        "testStrategy": "Test model fitting with synthetic multi-run data. Verify model selection criteria. Test extrapolation accuracy and confidence intervals.",
+        "priority": "low",
+        "dependencies": [
+          5
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement Mathematical Model Functions",
+            "description": "Create functions for exponential, polynomial, and power-law growth models",
+            "dependencies": [],
+            "details": "Implement mathematical functions for each growth model type: exponential (a*exp(b*t)), polynomial (a + b*t + c*t^2), and power-law (a*t^b). Create a unified interface for all model types with proper parameter initialization and bounds. Include error handling for invalid parameters and numerical instabilities.",
+            "status": "pending",
+            "testStrategy": "Unit test each model function with known parameter sets and verify mathematical correctness"
+          },
+          {
+            "id": 2,
+            "title": "Integrate scipy.optimize.curve_fit for Model Fitting",
+            "description": "Implement curve fitting functionality using scipy for parameter estimation",
+            "dependencies": [
+              1
+            ],
+            "details": "Use scipy.optimize.curve_fit to fit each model type to historical depth data. Implement proper initial parameter guessing, bounds setting, and convergence handling. Add robust error handling for fitting failures and parameter estimation uncertainties using covariance matrix.",
+            "status": "pending",
+            "testStrategy": "Test fitting with synthetic data of known parameters and verify parameter recovery accuracy"
+          },
+          {
+            "id": 3,
+            "title": "Implement Model Selection Criteria",
+            "description": "Create R-squared and AIC calculation functions for model comparison",
+            "dependencies": [
+              2
+            ],
+            "details": "Implement R-squared calculation for goodness-of-fit assessment and Akaike Information Criterion (AIC) for model selection. Create a model comparison function that ranks models based on both criteria. Include handling for edge cases where models fail to converge or produce invalid results.",
+            "status": "pending",
+            "testStrategy": "Validate R-squared and AIC calculations against known statistical examples and verify model ranking logic"
+          },
+          {
+            "id": 4,
+            "title": "Create Multi-Run Data Validation and Processing",
+            "description": "Implement validation logic to ensure 3+ historical runs are available",
+            "dependencies": [],
+            "details": "Create validation functions to check for minimum 3 historical runs requirement. Implement data preprocessing to extract time points and depth values from multiple runs. Add data quality checks for sufficient data points per run and temporal consistency across runs.",
+            "status": "pending",
+            "testStrategy": "Test validation with various data scenarios including insufficient runs and malformed data"
+          },
+          {
+            "id": 5,
+            "title": "Integrate Non-Linear Models into Growth Calculation Pipeline",
+            "description": "Extend existing growth calculations to support non-linear model selection and prediction",
+            "dependencies": [
+              3,
+              4
+            ],
+            "details": "Modify the main growth calculation pipeline to automatically select the best-fitting model when 3+ runs are available. Implement fallback to linear model for insufficient data. Add confidence interval calculation for predictions and integrate with existing anomaly tracking workflow.",
+            "status": "pending",
+            "testStrategy": "Test end-to-end pipeline with multi-run synthetic data and verify model selection and prediction accuracy"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Develop Comprehensive Test Suite",
+        "description": "Create unit and integration tests covering all core functionality and edge cases",
+        "details": "Write comprehensive test suite using pytest framework. Unit tests for: clock_to_degrees, angular_difference, normalise_orientation, alignment calculations, matching algorithms. Integration tests with known sample data and expected results. Edge case tests: empty runs, single anomaly, all unmatched, identical runs, pipeline wrapping. Use pytest fixtures for test data setup. Achieve >90% code coverage. Example: @pytest.fixture def sample_data(): return pd.DataFrame({'feature_id': [1,2], 'distance': [100,200], ...})",
+        "testStrategy": "Run pytest with coverage reporting. Test all functions with boundary conditions. Verify integration test results match expected outputs.",
+        "priority": "high",
+        "dependencies": [
+          7
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create Unit Tests for Core Mathematical Functions",
+            "description": "Implement comprehensive unit tests for all mathematical utility functions including clock_to_degrees, angular_difference, and normalise_orientation",
+            "dependencies": [],
+            "details": "Write pytest unit tests for clock_to_degrees (test 12 o'clock = 0°, 3 o'clock = 90°, etc.), angular_difference (test wraparound cases like 350° to 10°), and normalise_orientation (test negative angles, angles > 360°). Include boundary value testing and invalid input handling. Use parametrized tests for comprehensive coverage.",
+            "status": "pending",
+            "testStrategy": "Use pytest.mark.parametrize for multiple test cases. Test boundary conditions and invalid inputs. Verify mathematical accuracy with known values."
+          },
+          {
+            "id": 2,
+            "title": "Develop Unit Tests for Alignment Calculations",
+            "description": "Create unit tests for distance alignment and multi-point interpolation functions with various pipeline configurations",
+            "dependencies": [
+              1
+            ],
+            "details": "Test alignment calculation functions including constant offset alignment and piecewise linear interpolation. Create test cases for single reference point, multiple reference points, and edge cases like pipeline wrapping. Mock scipy.interpolate.interp1d behavior and test stretch factor calculations between segments.",
+            "status": "pending",
+            "testStrategy": "Test with synthetic data having known stretch factors. Verify interpolation accuracy and fallback to constant offset when needed."
+          },
+          {
+            "id": 3,
+            "title": "Implement Unit Tests for Matching Algorithms",
+            "description": "Build comprehensive unit tests for anomaly matching algorithms including one-to-one, many-to-one, and coalescence detection",
+            "dependencies": [
+              2
+            ],
+            "details": "Test matching algorithms with various scenarios: perfect matches, partial matches, unmatched anomalies, and coalescence cases. Include tests for distance-based matching, orientation matching, and combined scoring. Test configurable thresholds and matching criteria. Create edge cases with empty datasets and single anomalies.",
+            "status": "pending",
+            "testStrategy": "Use pytest fixtures for test data setup. Test all matching scenarios with known expected results. Verify threshold behavior and scoring accuracy."
+          },
+          {
+            "id": 4,
+            "title": "Create Integration Tests with Sample Data",
+            "description": "Develop integration tests using realistic pipeline inspection data to verify end-to-end functionality",
+            "dependencies": [
+              3
+            ],
+            "details": "Create pytest fixtures with realistic sample data including multiple pipeline runs with known anomalies. Test complete workflow from data loading through matching to output generation. Include tests for different input formats (CSV, Excel) and verify output structure matches expected schema. Test with actual pipeline data scenarios.",
+            "status": "pending",
+            "testStrategy": "Use pytest fixtures for sample data setup. Compare integration test results with manually verified expected outputs. Test complete data pipeline flow."
+          },
+          {
+            "id": 5,
+            "title": "Implement Edge Case and Coverage Testing",
+            "description": "Create comprehensive edge case tests and achieve >90% code coverage with pytest-cov reporting",
+            "dependencies": [
+              4
+            ],
+            "details": "Implement edge case tests for: empty runs, single anomaly datasets, all unmatched scenarios, identical runs, pipeline wrapping cases, and invalid input data. Set up pytest-cov for coverage reporting and ensure >90% coverage target. Add tests for error handling and exception cases. Create performance tests for large datasets.",
+            "status": "pending",
+            "testStrategy": "Run pytest with coverage reporting using pytest-cov. Test all edge cases and boundary conditions. Verify error handling and exception paths are covered."
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Enhance CLI and Add Configuration Management",
+        "description": "Extend CLI with YAML/JSON configuration support, logging levels, and interactive modes",
+        "details": "Extend existing argparse CLI with YAML/JSON configuration file support using PyYAML. Add logging levels (--verbose, --quiet) using Python logging module. Implement --dry-run mode for preview without file output. Add interactive mode for match review using rich/click libraries. Configuration schema: matching_thresholds, growth_rate_limits, output_formats, reference_points. Example: import yaml; config = yaml.safe_load(open('config.yaml')); logger = logging.getLogger(__name__); logger.setLevel(logging.DEBUG if args.verbose else logging.INFO)",
+        "testStrategy": "Test CLI argument parsing and configuration file loading. Verify logging output at different levels. Test dry-run and interactive modes with user input simulation.",
+        "priority": "medium",
+        "dependencies": [
+          8
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement YAML/JSON Configuration File Support",
+            "description": "Add configuration file loading and parsing functionality to support YAML and JSON formats",
+            "dependencies": [],
+            "details": "Extend existing argparse CLI to accept --config parameter for configuration file path. Implement configuration loading using PyYAML for YAML files and json module for JSON files. Define configuration schema with matching_thresholds, growth_rate_limits, output_formats, and reference_points. Add validation for configuration structure and merge with command-line arguments with CLI taking precedence.",
+            "status": "pending",
+            "testStrategy": "Test with valid/invalid YAML and JSON config files. Verify schema validation and CLI argument precedence over config file values."
+          },
+          {
+            "id": 2,
+            "title": "Add Logging Levels and Configuration",
+            "description": "Implement configurable logging with verbose and quiet modes using Python logging module",
+            "dependencies": [
+              1
+            ],
+            "details": "Set up Python logging module with configurable levels. Add --verbose flag for DEBUG level logging and --quiet flag for ERROR level only. Default to INFO level. Configure log formatting with timestamps and module names. Allow log level configuration through config file. Example: logger = logging.getLogger(__name__); logger.setLevel(logging.DEBUG if args.verbose else logging.INFO)",
+            "status": "pending",
+            "testStrategy": "Test logging output at different verbosity levels. Verify log formatting and configuration file integration for log settings."
+          },
+          {
+            "id": 3,
+            "title": "Implement Dry-Run Mode",
+            "description": "Add dry-run functionality to preview operations without writing output files",
+            "dependencies": [
+              2
+            ],
+            "details": "Add --dry-run CLI flag that prevents file output operations while showing what would be written. Display preview of matching results, statistics, and output file paths that would be created. Log all operations that would be performed without executing them. Ensure all analysis and matching logic runs normally but skip file I/O operations.",
+            "status": "pending",
+            "testStrategy": "Test dry-run mode shows correct preview without creating files. Verify all analysis runs normally and output matches non-dry-run results."
+          },
+          {
+            "id": 4,
+            "title": "Create Interactive Match Review Mode",
+            "description": "Implement interactive mode for reviewing and approving anomaly matches using rich/click libraries",
+            "dependencies": [
+              3
+            ],
+            "details": "Add --interactive CLI flag to enable match review mode. Use rich library for formatted console output showing match details, confidence scores, and anomaly properties. Implement user prompts to accept/reject/modify matches. Allow users to manually assign matches or mark as unmatched. Save user decisions and apply them to final output. Use click for enhanced CLI interactions.",
+            "status": "pending",
+            "testStrategy": "Test interactive prompts with simulated user input. Verify match modifications are applied correctly and user decisions are preserved in output."
+          },
+          {
+            "id": 5,
+            "title": "Integrate Enhanced CLI Components",
+            "description": "Combine all CLI enhancements into cohesive command-line interface with comprehensive help and error handling",
+            "dependencies": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "details": "Integrate configuration loading, logging, dry-run, and interactive modes into unified CLI. Add comprehensive help text and usage examples. Implement proper error handling for configuration errors, file access issues, and user input validation. Add CLI argument validation and meaningful error messages. Ensure all modes work together correctly (e.g., dry-run with interactive mode).",
+            "status": "pending",
+            "testStrategy": "Test all CLI combinations and modes together. Verify error handling and help text. Test configuration file integration with all CLI features."
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "Add Pipeline Operator Standard Export Formats",
+        "description": "Implement export functionality for common pipeline operator data formats and standards",
+        "details": "Research and implement export formats used by major pipeline operators (TransCanada, Enbridge, Kinder Morgan). Support common formats: PODS (Pipeline Open Data Standard), PIMS export, custom XML schemas. Use xml.etree.ElementTree for XML generation, openpyxl for Excel templates. Create format-specific field mappings and validation. Example: def export_to_pods(matched_data): root = ET.Element('PODSData'); for anomaly in matched_data: feature_elem = ET.SubElement(root, 'Feature'); ET.SubElement(feature_elem, 'ID').text = str(anomaly['feature_id'])",
+        "testStrategy": "Validate exported formats against operator specifications. Test with sample data and verify field mappings. Test XML schema validation where applicable.",
+        "priority": "medium",
+        "dependencies": [
+          6
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Research Pipeline Operator Export Format Standards",
+            "description": "Research and document export format specifications for major pipeline operators including TransCanada, Enbridge, and Kinder Morgan",
+            "dependencies": [],
+            "details": "Analyze PODS (Pipeline Open Data Standard), PIMS export formats, and custom XML schemas used by major operators. Document field mappings, data structures, and validation requirements for each format. Create specification documents detailing required fields, data types, and format constraints.",
+            "status": "pending",
+            "testStrategy": "Validate research findings against publicly available operator documentation and industry standards"
+          },
+          {
+            "id": 2,
+            "title": "Implement PODS Export Format Generator",
+            "description": "Create export functionality for Pipeline Open Data Standard (PODS) format using XML structure",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement PODS XML export using xml.etree.ElementTree. Create PODSData root element with Feature subelements containing anomaly data. Map pipeline anomaly fields to PODS standard fields including ID, location, depth, feature type, and assessment data. Handle data type conversions and required field validation.",
+            "status": "pending",
+            "testStrategy": "Test XML generation with sample anomaly data and validate against PODS schema specifications"
+          },
+          {
+            "id": 3,
+            "title": "Implement PIMS Export Format Generator",
+            "description": "Create export functionality for Pipeline Integrity Management System (PIMS) format",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement PIMS export format supporting both XML and Excel templates using openpyxl for Excel generation. Create field mappings for PIMS-specific data structures including integrity assessment results, anomaly classifications, and repair recommendations. Handle PIMS-specific data validation and formatting requirements.",
+            "status": "pending",
+            "testStrategy": "Validate PIMS exports against operator-specific templates and verify field mapping accuracy"
+          },
+          {
+            "id": 4,
+            "title": "Implement Custom XML Schema Export Support",
+            "description": "Create flexible XML export system supporting operator-specific custom XML schemas",
+            "dependencies": [
+              1
+            ],
+            "details": "Build configurable XML export system using xml.etree.ElementTree that can adapt to custom operator schemas. Implement schema configuration files defining element structures, field mappings, and validation rules. Support dynamic XML generation based on operator-specific requirements and custom field mappings.",
+            "status": "pending",
+            "testStrategy": "Test with multiple custom XML schemas and validate generated XML against operator specifications"
+          },
+          {
+            "id": 5,
+            "title": "Create Export Format Validation and Testing Framework",
+            "description": "Implement comprehensive validation system for all export formats with field mapping verification",
+            "dependencies": [
+              2,
+              3,
+              4
+            ],
+            "details": "Create validation framework that verifies exported data integrity, field mapping accuracy, and format compliance. Implement automated testing with sample pipeline anomaly data across all supported export formats. Add validation against XML schemas where applicable and create comprehensive test suite covering edge cases and data type conversions.",
+            "status": "pending",
+            "testStrategy": "Run validation tests against operator specifications and verify exported data matches expected formats and field mappings"
+          }
+        ]
+      },
+      {
+        "id": 11,
+        "title": "Create Comprehensive Documentation",
+        "description": "Add docstrings, README, and usage examples with complete API documentation",
+        "details": "Add Google-style docstrings to all public functions and classes. Create comprehensive README.md with installation, usage examples, input format specifications, and output field descriptions. Document configuration file schema and CLI options. Include example workflow with sample data walkthrough. Use Sphinx for API documentation generation. Example docstring format: '''Calculate corrosion growth rate. Args: depth1 (float): Initial depth percentage. depth2 (float): Final depth percentage. time_diff (float): Time difference in years. Returns: float: Growth rate in %/year'''",
+        "testStrategy": "Verify docstring completeness with pydocstyle. Test README examples with fresh environment. Generate and review Sphinx documentation.",
+        "priority": "medium",
+        "dependencies": [
+          10
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Add Google-style docstrings to all public functions and classes",
+            "description": "Implement comprehensive Google-style docstrings for all public functions and classes in the codebase",
+            "dependencies": [],
+            "details": "Add Google-style docstrings to all public functions and classes following the specified format. Include Args, Returns, Raises sections where applicable. Example format: '''Calculate corrosion growth rate. Args: depth1 (float): Initial depth percentage. depth2 (float): Final depth percentage. time_diff (float): Time difference in years. Returns: float: Growth rate in %/year'''",
+            "status": "pending",
+            "testStrategy": "Use pydocstyle to verify docstring completeness and format compliance"
+          },
+          {
+            "id": 2,
+            "title": "Create comprehensive README.md with installation and usage examples",
+            "description": "Develop a complete README.md file with installation instructions, usage examples, and input/output specifications",
+            "dependencies": [
+              1
+            ],
+            "details": "Create comprehensive README.md including installation instructions, basic usage examples, input format specifications (CSV/Excel structure), output field descriptions, and configuration options. Include code examples showing typical workflow and expected outputs.",
+            "status": "pending",
+            "testStrategy": "Test all README examples in a fresh environment to ensure they work correctly"
+          },
+          {
+            "id": 3,
+            "title": "Document configuration file schema and CLI options",
+            "description": "Create detailed documentation for configuration file structure and command-line interface options",
+            "dependencies": [
+              1
+            ],
+            "details": "Document the complete configuration file schema including all available parameters, their types, default values, and descriptions. Document all CLI options with examples. Create schema validation documentation and parameter reference guide.",
+            "status": "pending",
+            "testStrategy": "Validate configuration examples against actual schema and test CLI option documentation"
+          },
+          {
+            "id": 4,
+            "title": "Create example workflow with sample data walkthrough",
+            "description": "Develop a complete example workflow demonstrating the tool's capabilities with sample data",
+            "dependencies": [
+              2,
+              3
+            ],
+            "details": "Create a step-by-step example workflow using sample data that demonstrates input preparation, configuration setup, execution, and output interpretation. Include sample CSV/Excel files, configuration files, and expected outputs with explanations.",
+            "status": "pending",
+            "testStrategy": "Execute the complete example workflow to verify all steps work correctly and produce expected results"
+          },
+          {
+            "id": 5,
+            "title": "Set up Sphinx for API documentation generation",
+            "description": "Configure Sphinx to automatically generate API documentation from docstrings",
+            "dependencies": [
+              1
+            ],
+            "details": "Set up Sphinx configuration with autodoc extension to generate API documentation from Google-style docstrings. Configure themes, structure, and build process. Create index pages and organize documentation sections. Set up automated documentation building.",
+            "status": "pending",
+            "testStrategy": "Generate Sphinx documentation and review for completeness, formatting, and accuracy of API references"
+          }
+        ]
+      },
+      {
+        "id": 12,
+        "title": "Performance Optimization and Memory Management",
+        "description": "Optimize performance for large datasets and implement memory-efficient processing",
+        "details": "Profile code using cProfile and memory_profiler to identify bottlenecks. Implement chunked processing for large datasets using pandas.read_csv(chunksize=). Optimize matching algorithms with spatial indexing (scipy.spatial.KDTree) for large anomaly sets. Add progress bars using tqdm. Implement parallel processing for independent calculations using multiprocessing.Pool. Example: from scipy.spatial import KDTree; tree = KDTree(run1_positions); distances, indices = tree.query(run2_positions, k=5); from multiprocessing import Pool; with Pool() as pool: results = pool.map(calculate_growth_rate, anomaly_pairs)",
+        "testStrategy": "Benchmark performance with large synthetic datasets (10k+ anomalies). Monitor memory usage during processing. Verify parallel processing produces identical results to serial processing.",
+        "priority": "low",
+        "dependencies": [
+          11
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Profile code performance and identify bottlenecks",
+            "description": "Use cProfile and memory_profiler to analyze current code performance and identify computational bottlenecks",
+            "dependencies": [],
+            "details": "Implement comprehensive profiling using cProfile for CPU performance analysis and memory_profiler for memory usage tracking. Create profiling scripts that run the existing codebase with sample datasets of varying sizes. Generate detailed reports showing function call times, memory consumption patterns, and identify the most resource-intensive operations. Set up automated profiling pipeline that can be run before and after optimizations.",
+            "status": "pending",
+            "testStrategy": "Run profiling on datasets of different sizes (1k, 5k, 10k anomalies). Compare baseline performance metrics and validate profiling accuracy."
+          },
+          {
+            "id": 2,
+            "title": "Implement chunked processing for large datasets",
+            "description": "Add memory-efficient chunked processing using pandas.read_csv with chunksize parameter",
+            "dependencies": [
+              1
+            ],
+            "details": "Modify data loading functions to support chunked processing using pandas.read_csv(chunksize=) for large CSV files. Implement chunk aggregation logic that processes data in manageable pieces while maintaining result consistency. Add automatic chunk size determination based on available memory. Create streaming processing pipeline that can handle datasets larger than available RAM without performance degradation.",
+            "status": "pending",
+            "testStrategy": "Test with large synthetic datasets exceeding available memory. Verify identical results between chunked and non-chunked processing. Monitor memory usage during processing."
+          },
+          {
+            "id": 3,
+            "title": "Optimize matching algorithms with spatial indexing",
+            "description": "Implement scipy.spatial.KDTree for efficient spatial queries in anomaly matching",
+            "dependencies": [
+              1
+            ],
+            "details": "Replace linear search algorithms with KDTree-based spatial indexing using scipy.spatial.KDTree for efficient nearest neighbor queries. Implement optimized matching that builds KDTree from run1 positions and queries run2 positions with configurable k-nearest neighbors. Add support for distance-based filtering and batch query processing. Optimize tree construction and query parameters for different dataset sizes.",
+            "status": "pending",
+            "testStrategy": "Benchmark KDTree vs linear search performance on datasets of varying sizes. Verify matching accuracy and consistency. Test with different k-values and distance thresholds."
+          },
+          {
+            "id": 4,
+            "title": "Add progress tracking with tqdm progress bars",
+            "description": "Implement progress bars using tqdm for long-running operations to provide user feedback",
+            "dependencies": [
+              2,
+              3
+            ],
+            "details": "Integrate tqdm progress bars for all time-consuming operations including data loading, chunked processing, spatial indexing, and matching algorithms. Add nested progress bars for multi-stage operations with descriptive labels. Implement progress estimation based on data size and historical performance metrics. Add configurable verbosity levels and silent mode for automated processing.",
+            "status": "pending",
+            "testStrategy": "Verify progress bar accuracy and smooth updates during processing. Test nested progress bars and different verbosity levels. Ensure no performance impact from progress tracking."
+          },
+          {
+            "id": 5,
+            "title": "Implement parallel processing with multiprocessing.Pool",
+            "description": "Add parallel processing capabilities for independent calculations using multiprocessing.Pool",
+            "dependencies": [
+              3,
+              4
+            ],
+            "details": "Implement parallel processing using multiprocessing.Pool for embarrassingly parallel operations like growth rate calculations and anomaly pair processing. Add automatic CPU core detection and configurable worker count. Implement proper data serialization for inter-process communication and result aggregation. Add fallback to serial processing for small datasets where parallelization overhead exceeds benefits.",
+            "status": "pending",
+            "testStrategy": "Verify parallel processing produces identical results to serial processing. Benchmark performance scaling with different worker counts. Test memory usage and process management."
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "created": "2026-02-07T19:56:41.692Z",
+      "updated": "2026-02-07T19:56:41.692Z",
+      "description": "Tasks for master context"
+    }
+  }
+}
