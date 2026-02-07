@@ -40,3 +40,4 @@ alignment_report.json
 
 # OS specific
 .DS_Store
+.taskmaster/
