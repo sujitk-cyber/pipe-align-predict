@@ -35,5 +35,8 @@ new_anomalies.csv
 matched_results.csv
 alignment_report.json
 
+# Docs
+*.docx
+
 # OS specific
 .DS_Store
