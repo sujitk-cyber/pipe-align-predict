@@ -1,0 +1,16 @@
+feature_id,distance,clock_position,feature_type,orientation,depth_percent,length,width,wall_thickness,original_distance
+New-7,101.70517056817287,8:00,External Metal Loss,OD,11.5,1.0,1.0,0.25,107.17
+New-2,304.05517056817285,1:00,External Metal Loss,OD,10.0,1.0,1.0,0.25,309.52
+New-3,420.72517056817287,10:00,External Metal Loss,OD,12.7,1.0,1.0,0.25,426.19
+New-14,425.0051705681729,6:00,External Metal Loss,OD,19.5,1.0,1.0,0.25,430.47
+New-9,607.365170568173,6:00,External Metal Loss,OD,17.8,1.0,1.0,0.25,612.83
+New-1,673.865170568173,2:00,External Metal Loss,OD,19.7,1.0,1.0,0.25,679.33
+New-8,857.2751705681728,11:00,External Metal Loss,OD,10.2,1.0,1.0,0.25,862.74
+New-5,1055.3751705681727,2:00,External Metal Loss,OD,12.5,1.0,1.0,0.25,1060.84
+New-0,1116.7351705681729,3:00,External Metal Loss,OD,10.9,1.0,1.0,0.25,1122.2
+New-11,1156.5951705681728,1:00,External Metal Loss,OD,12.2,1.0,1.0,0.25,1162.06
+New-4,1345.8751705681727,1:00,External Metal Loss,OD,15.7,1.0,1.0,0.25,1351.34
+New-6,1357.8251705681728,11:00,External Metal Loss,OD,15.6,1.0,1.0,0.25,1363.29
+New-10,1485.8451705681728,12:00,External Metal Loss,OD,11.5,1.0,1.0,0.25,1491.31
+New-12,1562.7551705681728,1:00,External Metal Loss,OD,15.3,1.0,1.0,0.25,1568.22
+New-13,1803.185170568173,6:00,External Metal Loss,OD,19.0,1.0,1.0,0.25,1808.65

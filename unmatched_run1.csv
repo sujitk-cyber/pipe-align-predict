@@ -1,0 +1,24 @@
+feature_id,distance,clock_position,feature_type,orientation,depth_percent,length,width,wall_thickness
+A-19,106.59,6:00,Dent,OD,29.8,3.98,3.92,0.25
+A-38,272.89,11:30,Dent,OD,31.0,3.84,2.6,0.25
+A-44,292.93,2:15,External Metal Loss,OD,24.4,2.82,4.33,0.25
+A-22,321.34,2:45,External Metal Loss,OD,39.6,4.97,2.19,0.25
+A-8,361.63,4:00,External Metal Loss,OD,7.1,1.24,0.57,0.25
+A-40,396.21,4:00,Dent,OD,29.5,1.59,4.28,0.25
+A-26,558.14,11:00,Internal Metal Loss,ID,6.5,3.85,4.57,0.25
+A-24,581.38,6:15,External Metal Loss,OD,22.0,2.73,4.31,0.25
+A-35,691.94,6:30,External Metal Loss,OD,31.9,4.68,2.99,0.25
+A-7,829.91,1:30,Internal Metal Loss,ID,32.5,0.6,0.95,0.25
+A-49,919.55,8:00,External Metal Loss,OD,20.6,2.38,3.86,0.25
+A-43,1022.34,8:15,External Metal Loss,OD,10.0,3.67,4.58,0.25
+A-32,1121.84,11:15,External Metal Loss,OD,26.3,4.87,3.14,0.25
+A-39,1129.3,12:00,Dent,OD,27.0,2.5,2.3,0.25
+A-20,1181.61,4:00,Dent,OD,36.8,3.61,4.99,0.25
+A-27,1335.81,9:15,Dent,OD,35.6,3.97,4.37,0.25
+A-17,1490.86,3:00,Internal Metal Loss,ID,13.1,2.37,2.6,0.25
+A-3,1542.34,1:45,Dent,OD,30.9,2.66,1.3,0.25
+A-13,1694.46,5:30,Internal Metal Loss,ID,38.4,1.74,2.41,0.25
+A-37,1816.74,10:30,External Metal Loss,OD,16.9,2.77,3.38,0.25
+A-11,1820.93,3:45,External Metal Loss,OD,19.0,2.87,1.79,0.25
+A-1,1882.44,10:00,External Metal Loss,OD,26.6,3.94,2.5,0.25
+A-41,1886.49,10:30,External Metal Loss,OD,20.9,2.82,3.18,0.25
