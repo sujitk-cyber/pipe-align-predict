@@ -21,5 +21,19 @@ node_modules/
 *.sln
 *.sw?
 
+# Python
+__pycache__/
+*.pyc
+
+# Pipeline output files
+outputs/
+matched_anomalies.csv
+unmatched_run1.csv
+unmatched_run2.csv
+missing_anomalies.csv
+new_anomalies.csv
+matched_results.csv
+alignment_report.json
+
 # OS specific
 .DS_Store

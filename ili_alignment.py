@@ -1,12 +1,13 @@
 """
 Pipeline ILI Data Alignment and Corrosion Growth Analysis
 
-Reads two ILI run datasets (CSV), aligns them by distance, matches anomalies
-between runs, computes corrosion growth rates, and outputs results.
+Reads two ILI run datasets (CSV or Excel), aligns them by distance, matches
+anomalies between runs, computes corrosion growth rates, and outputs results.
 """
 
 import argparse
 import logging
+import os
 import re
 import sys
 
@@ -30,6 +31,36 @@ DEFAULT_YEARS_BETWEEN_RUNS = 8.0
 REQUIRED_FIELDS = ["feature_id", "distance", "feature_type", "depth_percent"]
 OPTIONAL_FIELDS = ["clock_position", "orientation", "length", "width", "wall_thickness"]
 
+# Common alternative column names found in ILI vendor reports.
+# Maps normalised (lowercase, underscored) source names -> our canonical names.
+COLUMN_ALIASES = {
+    # distance
+    "log_dist.": "distance",
+    "log_dist._[ft]": "distance",
+    "ili_wheel_count_[ft.]": "distance",
+    # feature type / event
+    "event": "feature_type",
+    "event_description": "feature_type",
+    # depth
+    "depth_[%]": "depth_percent",
+    "metal_loss_depth_[%]": "depth_percent",
+    # clock position
+    "o'clock": "clock_position",
+    "o'clock_[hh:mm]": "clock_position",
+    # orientation
+    "id/od": "orientation",
+    "internal": "orientation",
+    # wall thickness
+    "t_[in]": "wall_thickness",
+    "wt_[in]": "wall_thickness",
+    # length / width
+    "length_[in]": "length",
+    "width_[in]": "width",
+    # joint number as feature_id fallback
+    "j._no.": "feature_id",
+    "joint_number": "feature_id",
+}
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -44,16 +75,22 @@ def clock_to_degrees(clock_value) -> float | None:
     Accepts:
       - strings: "4:30", "12:00", "6"
       - numeric (int/float) treated as hours (e.g. 4.5 -> 135°)
+      - datetime.time objects (common when reading Excel clock columns)
       - NaN / None -> None
     """
+    import datetime
+
     if clock_value is None or (isinstance(clock_value, float) and np.isnan(clock_value)):
         return None
 
-    if isinstance(clock_value, (int, float)):
+    # datetime.time from Excel (e.g. time(9, 30) -> 9:30)
+    if isinstance(clock_value, datetime.time):
+        hours = clock_value.hour + clock_value.minute / 60.0
+    elif isinstance(clock_value, (int, float)):
         hours = float(clock_value)
     elif isinstance(clock_value, str):
         clock_value = clock_value.strip()
-        m = re.match(r"^(\d{1,2}):(\d{2})$", clock_value)
+        m = re.match(r"^(\d{1,2}):(\d{2})(?::(\d{2}))?$", clock_value)
         if m:
             hours = int(m.group(1)) + int(m.group(2)) / 60.0
         else:
@@ -93,21 +130,152 @@ def normalise_orientation(val) -> str | None:
 # Data loading
 # ---------------------------------------------------------------------------
 
-def load_run(path: str, label: str) -> pd.DataFrame:
-    """Read a CSV ILI run file and validate expected columns."""
-    df = pd.read_csv(path)
-    # Normalise column names: lowercase, strip whitespace, underscores for spaces
-    df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
+EXCEL_EXTENSIONS = (".xlsx", ".xls", ".xlsm", ".xlsb")
 
+
+def _read_file(path: str, sheet_name: int | str = 0) -> pd.DataFrame:
+    """Read a CSV or Excel file into a DataFrame based on file extension."""
+    ext = os.path.splitext(path)[1].lower()
+    if ext in EXCEL_EXTENSIONS:
+        try:
+            import openpyxl  # noqa: F401 – needed by pandas for .xlsx
+        except ImportError:
+            log.error(
+                "openpyxl is required to read Excel files. "
+                "Install it with: pip install openpyxl"
+            )
+            sys.exit(1)
+        return pd.read_excel(path, sheet_name=sheet_name)
+    return pd.read_csv(path)
+
+
+def validate_dataframe(df: pd.DataFrame, label: str) -> pd.DataFrame:
+    """Validate and clean an ILI run DataFrame.
+
+    Checks performed:
+      1. Required columns must be present.
+      2. Duplicate feature_ids are removed (first occurrence kept).
+      3. Rows with null required fields are dropped.
+      4. depth_percent must be >= 0.
+      5. clock_position (if present) is validated to 0-12 hour range.
+      6. distance must be numeric and non-negative.
+      7. Optional numeric fields get NaN where non-numeric.
+
+    Returns the cleaned DataFrame (may have fewer rows than input).
+    """
+    initial_count = len(df)
+
+    # --- Required columns ---
     missing = [f for f in REQUIRED_FIELDS if f not in df.columns]
     if missing:
         log.error("%s is missing required columns: %s", label, missing)
         sys.exit(1)
 
+    # --- Drop rows where required fields are null ---
+    before = len(df)
+    df = df.dropna(subset=REQUIRED_FIELDS)
+    dropped = before - len(df)
+    if dropped:
+        log.warning("%s: dropped %d rows with null required fields", label, dropped)
+
+    # --- Duplicate feature_ids ---
+    dup_mask = df.duplicated(subset=["feature_id"], keep="first")
+    n_dups = dup_mask.sum()
+    if n_dups:
+        dup_ids = df.loc[dup_mask, "feature_id"].tolist()
+        log.warning(
+            "%s: removed %d duplicate feature_id(s): %s",
+            label, n_dups, dup_ids[:10],  # show first 10
+        )
+        df = df[~dup_mask]
+
+    # --- depth_percent >= 0 ---
+    df["depth_percent"] = pd.to_numeric(df["depth_percent"], errors="coerce")
+    neg_depth = df["depth_percent"] < 0
+    if neg_depth.any():
+        log.warning(
+            "%s: removed %d rows with negative depth_percent", label, neg_depth.sum(),
+        )
+        df = df[~neg_depth]
+
+    # --- distance must be numeric and >= 0 ---
+    df["distance"] = pd.to_numeric(df["distance"], errors="coerce")
+    bad_dist = df["distance"].isna() | (df["distance"] < 0)
+    if bad_dist.any():
+        log.warning(
+            "%s: removed %d rows with invalid distance", label, bad_dist.sum(),
+        )
+        df = df[~bad_dist]
+
+    # --- clock_position validation (0-12 hour range) ---
+    if "clock_position" in df.columns:
+        def _valid_clock(val):
+            deg = clock_to_degrees(val)
+            if deg is None:
+                return False
+            # degrees should be 0-360 (corresponds to 0-12 hours); always true
+            # after clock_to_degrees, but check the raw hour value is 0-12
+            return True
+
+        bad_clock = ~df["clock_position"].apply(_valid_clock)
+        if bad_clock.any():
+            log.warning(
+                "%s: set %d unparseable clock_position values to NaN",
+                label, bad_clock.sum(),
+            )
+            df.loc[bad_clock, "clock_position"] = np.nan
+
+    # --- Coerce optional numeric fields ---
+    for col in ("length", "width", "wall_thickness"):
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    df = df.reset_index(drop=True)
+
+    final_count = len(df)
+    if final_count < initial_count:
+        log.info(
+            "%s: validation reduced rows from %d to %d",
+            label, initial_count, final_count,
+        )
+
+    return df
+
+
+def load_run(path: str, label: str, sheet_name: int | str = 0) -> pd.DataFrame:
+    """Read a CSV or Excel ILI run file, validate and clean it.
+
+    Supports .csv, .xlsx, .xls, .xlsm, .xlsb.
+    The *sheet_name* parameter is used only for Excel files (default: first sheet).
+    """
+    if not os.path.isfile(path):
+        log.error("%s: file not found: %s", label, path)
+        sys.exit(1)
+
+    df = _read_file(path, sheet_name=sheet_name)
+
+    # Normalise column names: lowercase, strip whitespace, underscores for spaces,
+    # collapse newlines
+    df.columns = [
+        c.strip().lower().replace("\n", "_").replace(" ", "_") for c in df.columns
+    ]
+
+    # Apply column aliases so vendor-specific names map to our canonical fields
+    rename_map = {}
+    for col in df.columns:
+        if col in COLUMN_ALIASES and COLUMN_ALIASES[col] not in df.columns:
+            rename_map[col] = COLUMN_ALIASES[col]
+    if rename_map:
+        log.info("%s: mapped columns: %s", label, rename_map)
+        df = df.rename(columns=rename_map)
+
+    # Validate and clean
+    df = validate_dataframe(df, label)
+
     present_optional = [f for f in OPTIONAL_FIELDS if f in df.columns]
     log.info(
-        "%s: loaded %d anomalies  |  optional fields present: %s",
-        label, len(df), present_optional or "(none)",
+        "%s: loaded %d anomalies from %s  |  optional fields: %s",
+        label, len(df), os.path.basename(path), present_optional or "(none)",
     )
     return df
 
@@ -366,8 +534,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="ILI Run Alignment & Corrosion Growth Analysis",
     )
-    parser.add_argument("run1", help="Path to Run 1 CSV file")
-    parser.add_argument("run2", help="Path to Run 2 CSV file")
+    parser.add_argument("run1", help="Path to Run 1 data file (CSV or Excel)")
+    parser.add_argument("run2", help="Path to Run 2 data file (CSV or Excel)")
+    parser.add_argument(
+        "--sheet", default=0,
+        help="Sheet name or index for Excel files (default: first sheet)",
+    )
     parser.add_argument(
         "--years", type=float, default=DEFAULT_YEARS_BETWEEN_RUNS,
         help=f"Years between inspections (default: {DEFAULT_YEARS_BETWEEN_RUNS})",
@@ -394,8 +566,15 @@ def main() -> None:
     log.info("=" * 60)
     log.info("Step 1: Loading ILI run data")
     log.info("=" * 60)
-    run1 = load_run(args.run1, "Run 1")
-    run2 = load_run(args.run2, "Run 2")
+    # Resolve sheet arg: try int conversion for numeric sheet indices
+    sheet = args.sheet
+    try:
+        sheet = int(sheet)
+    except (ValueError, TypeError):
+        pass
+
+    run1 = load_run(args.run1, "Run 1", sheet_name=sheet)
+    run2 = load_run(args.run2, "Run 2", sheet_name=sheet)
 
     # Step 2: Align distances
     log.info("=" * 60)

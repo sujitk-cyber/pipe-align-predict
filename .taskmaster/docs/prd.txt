@@ -1,68 +1,94 @@
-# Pipeline ILI Data Alignment and Corrosion Growth Analysis
+# Intelligent Pipeline Inspection (ILI) Data Alignment & Corrosion Growth Prediction
 
 ## Overview
-A Python program for pipeline In-Line Inspection (ILI) data alignment and corrosion growth analysis. The program reads two ILI run datasets (CSV files) for the same pipeline segment, aligns them by distance, matches anomalies between runs, computes corrosion growth rates, and outputs results.
+Backend/data pipeline for automated ILI run alignment, anomaly matching, and corrosion growth prediction. NO FRONTEND — outputs are clean CSVs/JSON that a UI (Figma) consumes later.
 
-## Current State
-An MVP implementation exists in `ili_alignment.py` with sample data files (`sample_run1.csv`, `sample_run2.csv`). The MVP supports:
-- CSV loading with column validation
-- Constant-offset distance alignment using weld references
-- Greedy one-to-one anomaly matching by distance, clock position, orientation, and feature type
-- Depth, length, and width growth rate calculations
-- CSV output of matched/unmatched anomalies
+## Context
+ILI "smart pigs" inspect pipelines every 5–10 years. Each run reports the same physical features at slightly different distances due to odometer drift, speed variation, and reference point differences. Engineers manually align runs by matching fixed control points (girth welds, valves, tees, bends), then match anomalies across runs and compute corrosion growth. This manual process takes weeks.
 
-## Requirements
+## Inputs
+- Excel workbook: ILIDataV2.xlsx (contains multiple runs, e.g., 2007/2015/2022).
+- Start with 2015 vs 2022; optionally add 2007 for multi-run.
+- Vendor exports can differ in column names and formats.
 
-### 1. Data Input (Existing - Needs Enhancement)
-- Read two ILI run CSV datasets with fields: feature_id, distance, clock_position, feature_type, orientation, depth_percent, length, width, wall_thickness
-- Handle missing optional fields gracefully
-- Support additional input formats beyond CSV (e.g., Excel .xlsx)
-- Add data validation and cleaning (duplicate feature_ids, out-of-range values, negative depths)
+## Project Structure (backend-only)
+/src
+  io.py
+  preprocess.py
+  alignment.py
+  matching.py
+  growth.py
+  reporting.py
+run_pipeline.py
+README.md
+requirements.txt
 
-### 2. Distance Alignment (Existing - Needs Enhancement)
-- Current: constant offset using first weld reference
-- Add multi-point alignment using multiple weld/reference features
-- Implement piecewise linear interpolation between reference points to handle stretch/compression
-- Add stretch factor calculation when multiple reference points are available
-- Allow user-provided reference point mapping file
+## Core MVP Requirements
 
-### 3. Anomaly Matching (Existing - Needs Enhancement)
-- Current: greedy matching with distance + clock thresholds
-- Implement Hungarian algorithm (optimal assignment) as alternative to greedy
-- Add configurable weighting for distance vs clock vs depth similarity
-- Support many-to-one matching (anomaly coalescence detection)
-- Add match confidence scoring (high/medium/low based on proximity)
-- Handle edge case: features at pipeline start/end wrapping
+### 1. Ingest & Column Mapping
+- Read Excel/CSV with robust column mapping layer.
+- Config dict mapping because exports vary (e.g., "Log Dist [ft]" vs "ILI Wheel Count [ft]").
+- Auto-detection routine that inspects sheet columns and selects best mapping.
+- Log mapping decisions to alignment_report.json.
 
-### 4. Growth Rate Calculation (Existing - Needs Enhancement)
-- Current: linear depth/length/width growth per year
-- Add remaining wall thickness and safe operating pressure calculations (ASME B31G / RSTRENG)
-- Calculate estimated time to failure based on growth rate and critical depth threshold
-- Flag anomalies with growth rates exceeding configurable thresholds
-- Support non-linear growth models (if historical data from 3+ runs is available)
-- Calculate ERF (Estimated Repair Factor) for each anomaly
+### 2. Canonical Schema
+Canonical anomalies table with:
+- run_id, feature_id, distance, odometer, joint_number, relative_position
+- clock_position_raw, clock_deg (parsed numeric)
+- feature_type_raw, feature_type_norm
+- orientation (ID/OD)
+- depth_percent, length, width, wall_thickness
 
-### 5. Output and Reporting (Existing - Needs Enhancement)
-- Current: three CSV output files
-- Generate summary statistics report (mean/median/max growth rates by feature type, by pipeline segment)
-- Add HTML or PDF report generation with charts (depth growth distribution, worst-N anomalies)
-- Include a dig-list: anomalies ranked by severity/growth that need field verification
-- Export matched results in pipeline operator standard formats
+### 3. Control Point Identification
+- Identify control points per run (girth welds preferred, plus valves/tees/bends).
+- Matching priority: joint_number if available; else ordered sequence + type + spacing.
+- Store and write matched/unmatched control points to report.
 
-### 6. Testing
-- Write unit tests for clock_to_degrees, angular_difference, normalise_orientation
-- Write unit tests for alignment offset computation
-- Write integration tests with known sample data and expected matching results
-- Add edge case tests: empty runs, single anomaly, all unmatched, identical runs
+### 4. Piecewise Linear Alignment
+Primary: piecewise linear correction between consecutive matched control points.
+For each consecutive pair of matched control points:
+  scale = (A1-A0)/(B1-B0)
+  shift = A0 - scale*B0
+Apply corrected_distance_B = scale*distance_B + shift.
+Store per-segment scale/shift, residuals.
+Fallback: global affine if insufficient control points.
 
-### 7. CLI and Configuration
-- Current: argparse CLI with basic options
-- Add a YAML/JSON configuration file for default parameters
-- Add --verbose / --quiet logging levels
-- Add --dry-run mode that shows alignment and matching without writing files
-- Add interactive mode for reviewing and confirming matches
+### 5. Segment-wise Anomaly Matching
+- Match per aligned segment (between control points).
+- Candidate gating: |delta_distance| <= DIST_TOL, clock_distance <= CLOCK_TOL, compatible type, orientation match.
+- Build sparse candidate list (NOT full dense N×M).
+- Cost: w_dist*norm(delta_distance) + w_clock*norm(clock_delta) + w_depth*norm(delta_depth) + w_size*norm(delta_length,delta_width) + type_penalty.
+- Solve one-to-one per segment with Hungarian (scipy.optimize.linear_sum_assignment).
+- Thresholding: best_cost > COST_THRESH => UNCERTAIN; no candidate => unmatched.
+- Unmatched Run A => MISSING, Unmatched Run B => NEW.
 
-### 8. Documentation
-- Add docstrings to all public functions
-- Write a README with usage examples, input format specification, and output field descriptions
-- Include example workflow with sample data
+### 6. Growth Calculations
+- depth_growth_pct_per_year = (depth_B - depth_A) / years_between
+- length_growth_in_per_year, width_growth_in_per_year
+- Handle missing fields gracefully.
+
+### 7. Output Artifacts
+- matched_results.csv (RunA fields, RunB fields, corrected_distance, deltas, growth, confidence, status)
+- new_anomalies.csv
+- missing_anomalies.csv
+- alignment_report.json (matched control points, per-segment transforms, residuals, parameters, mapping decisions)
+
+### 8. CLI (run_pipeline.py)
+  python run_pipeline.py --file ILIDataV2.xlsx --run_a 2015 --run_b 2022 --outdir outputs/
+  Optional: --dist_tol, --clock_tol, --cost_thresh, --years_between, --enable_confidence, --enable_multirun
+
+### 9. README
+- One-command run instructions
+- Assumptions + parameter defaults
+- Alignment + matching + confidence explanation
+- Output file definitions
+- Troubleshooting
+
+## Stretch Goals (backend-only, after MVP)
+A) Confidence scoring: sigmoid-based confidence in [0,1] per match + explainability fields.
+B) Multi-run: 3 runs (2007, 2015, 2022), tracks_multi_run.csv with track_id.
+C) Performance: segment-wise matching + candidate gating for 10k+ anomalies.
+
+## Non-goals
+- NO UI, NO web server, NO Streamlit/Dash/React.
+- No deep learning. Deterministic + explainable methods only.
