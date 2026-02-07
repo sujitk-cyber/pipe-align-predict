@@ -172,3 +172,195 @@ def match_control_points(
 
     log.info("Joint-based matching insufficient (%d); falling back to sequence", len(matched))
     return match_control_points_by_sequence(cp_a, cp_b)
+
+
+# ---------------------------------------------------------------------------
+# Piecewise linear alignment
+# ---------------------------------------------------------------------------
+
+def compute_piecewise_transforms(
+    matched_cp: pd.DataFrame,
+) -> list[dict]:
+    """Compute per-segment scale and shift from matched control points.
+
+    For consecutive matched control point pairs (i, i+1):
+        scale = (a1 - a0) / (b1 - b0)
+        shift = a0 - scale * b0
+
+    So: corrected_b = scale * distance_b + shift
+
+    Returns a list of segment dicts:
+        {seg_id, a_start, a_end, b_start, b_end, scale, shift}
+
+    The first segment extends from -inf to the first control point,
+    and the last segment extends from the last control point to +inf
+    (both using the nearest segment's transform).
+    """
+    if len(matched_cp) < 2:
+        # Fallback: global affine from single point or no points
+        if len(matched_cp) == 1:
+            shift = matched_cp.iloc[0]["distance_a"] - matched_cp.iloc[0]["distance_b"]
+            log.warning("Only 1 control point — using constant offset %.2f ft", shift)
+            return [{
+                "seg_id": 0,
+                "a_start": -np.inf, "a_end": np.inf,
+                "b_start": -np.inf, "b_end": np.inf,
+                "scale": 1.0, "shift": shift,
+            }]
+        else:
+            log.warning("No control points matched — no alignment applied")
+            return [{
+                "seg_id": 0,
+                "a_start": -np.inf, "a_end": np.inf,
+                "b_start": -np.inf, "b_end": np.inf,
+                "scale": 1.0, "shift": 0.0,
+            }]
+
+    segments = []
+    cp = matched_cp.sort_values("distance_a").reset_index(drop=True)
+
+    for i in range(len(cp) - 1):
+        a0, a1 = cp.iloc[i]["distance_a"], cp.iloc[i + 1]["distance_a"]
+        b0, b1 = cp.iloc[i]["distance_b"], cp.iloc[i + 1]["distance_b"]
+
+        span_b = b1 - b0
+        if abs(span_b) < 1e-9:
+            # Degenerate segment — use offset only
+            scale = 1.0
+            shift = a0 - b0
+        else:
+            scale = (a1 - a0) / span_b
+            shift = a0 - scale * b0
+
+        segments.append({
+            "seg_id": i,
+            "a_start": a0,
+            "a_end": a1,
+            "b_start": b0,
+            "b_end": b1,
+            "scale": round(scale, 8),
+            "shift": round(shift, 4),
+        })
+
+    log.info("Computed %d piecewise segments", len(segments))
+    return segments
+
+
+def apply_alignment(
+    df_b: pd.DataFrame,
+    segments: list[dict],
+    matched_cp: pd.DataFrame,
+) -> pd.DataFrame:
+    """Apply piecewise linear correction to Run B distances.
+
+    For each row in df_b, finds the appropriate segment and applies:
+        corrected_distance = scale * distance + shift
+
+    Rows before the first control point use the first segment's transform.
+    Rows after the last control point use the last segment's transform.
+
+    Adds 'corrected_distance' column to a copy of df_b.
+    """
+    df = df_b.copy()
+    distances = df["distance"].values
+    corrected = np.empty_like(distances, dtype=float)
+
+    if not segments:
+        corrected[:] = distances
+        df["corrected_distance"] = corrected
+        return df
+
+    # Build sorted arrays of segment boundaries (in Run B space)
+    seg_b_starts = np.array([s["b_start"] for s in segments])
+
+    for i, d in enumerate(distances):
+        # Find which segment this distance falls in
+        # Use the last segment whose b_start <= d
+        idx = np.searchsorted(seg_b_starts, d, side="right") - 1
+        idx = max(0, min(idx, len(segments) - 1))
+
+        seg = segments[idx]
+        corrected[i] = seg["scale"] * d + seg["shift"]
+
+    df["corrected_distance"] = np.round(corrected, 4)
+    return df
+
+
+def compute_residuals(
+    matched_cp: pd.DataFrame,
+    segments: list[dict],
+) -> pd.DataFrame:
+    """Compute alignment residuals at each matched control point.
+
+    Residual = corrected_distance_b - distance_a (should be ~0 for good alignment).
+    """
+    cp = matched_cp.copy()
+    seg_b_starts = np.array([s["b_start"] for s in segments])
+
+    residuals = []
+    for _, row in cp.iterrows():
+        d_b = row["distance_b"]
+        idx = max(0, min(np.searchsorted(seg_b_starts, d_b, side="right") - 1, len(segments) - 1))
+        seg = segments[idx]
+        corrected = seg["scale"] * d_b + seg["shift"]
+        residuals.append(corrected - row["distance_a"])
+
+    cp["residual_ft"] = np.round(residuals, 6)
+    return cp
+
+
+# ---------------------------------------------------------------------------
+# High-level alignment pipeline
+# ---------------------------------------------------------------------------
+
+def align_runs(
+    df_a: pd.DataFrame,
+    df_b: pd.DataFrame,
+    cp_types: set[str] | None = None,
+) -> tuple[pd.DataFrame, list[dict], pd.DataFrame, pd.DataFrame]:
+    """Full alignment pipeline: extract control points, match, align.
+
+    Args:
+        df_a: canonical DataFrame for Run A (reference).
+        df_b: canonical DataFrame for Run B (to be corrected).
+        cp_types: which feature types to use as control points.
+
+    Returns:
+        (df_b_aligned, segments, matched_cp, residuals)
+        - df_b_aligned: Run B with 'corrected_distance' column added.
+        - segments: list of piecewise transform dicts.
+        - matched_cp: DataFrame of matched control point pairs.
+        - residuals: matched_cp with residual_ft column.
+    """
+    log.info("--- Alignment: extracting control points ---")
+    cp_a = extract_control_points(df_a, types=cp_types)
+    cp_b = extract_control_points(df_b, types=cp_types)
+
+    log.info("--- Alignment: matching control points ---")
+    matched_cp = match_control_points(cp_a, cp_b)
+
+    if matched_cp.empty:
+        log.error("No control points could be matched — alignment not possible")
+        df_b_out = df_b.copy()
+        df_b_out["corrected_distance"] = df_b_out["distance"]
+        return df_b_out, [], matched_cp, pd.DataFrame()
+
+    log.info("--- Alignment: computing piecewise transforms ---")
+    segments = compute_piecewise_transforms(matched_cp)
+
+    log.info("--- Alignment: applying correction to Run B ---")
+    df_b_aligned = apply_alignment(df_b, segments, matched_cp)
+
+    log.info("--- Alignment: computing residuals ---")
+    residuals = compute_residuals(matched_cp, segments)
+
+    # Summary stats
+    max_residual = residuals["residual_ft"].abs().max()
+    mean_residual = residuals["residual_ft"].abs().mean()
+    log.info(
+        "Alignment complete: %d segments, %d control points matched, "
+        "max residual=%.4f ft, mean residual=%.4f ft",
+        len(segments), len(matched_cp), max_residual, mean_residual,
+    )
+
+    return df_b_aligned, segments, matched_cp, residuals
