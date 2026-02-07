@@ -40,6 +40,93 @@ DEFAULT_WEIGHTS = {
 # Large cost for infeasible pairs in the Hungarian matrix
 BIG_COST = 1e6
 
+# Gaussian probability sigmas (tunable)
+DEFAULT_SIGMA_DIST = 5.0       # feet
+DEFAULT_SIGMA_CLOCK = 15.0     # degrees
+DEFAULT_SIGMA_DEPTH = 10.0     # percent
+
+# Sigmoid confidence parameters
+DEFAULT_ALPHA = 0.3
+DEFAULT_BETA = 0.5
+DEFAULT_GAMMA = 0.05
+
+
+# ---------------------------------------------------------------------------
+# Probabilistic scoring
+# ---------------------------------------------------------------------------
+
+def compute_match_probability(
+    delta_dist: float,
+    delta_clock: float | None,
+    delta_depth: float,
+    type_match: bool,
+    orientation_match: bool,
+    sigma_d: float = DEFAULT_SIGMA_DIST,
+    sigma_c: float = DEFAULT_SIGMA_CLOCK,
+    sigma_depth: float = DEFAULT_SIGMA_DEPTH,
+) -> float:
+    """Gaussian error model probability for a candidate pair.
+
+    score = exp(-[(delta_dist/sigma_d)^2 + (delta_clock/sigma_c)^2
+                  + (delta_depth/sigma_depth)^2]) * type_match * orient_match
+
+    Args:
+        delta_dist: absolute distance difference (ft).
+        delta_clock: angular clock difference (deg) or None.
+        delta_depth: absolute depth difference (%).
+        type_match: True if feature types are compatible.
+        orientation_match: True if orientations match.
+        sigma_d, sigma_c, sigma_depth: Gaussian kernel widths.
+
+    Returns:
+        Probability in [0, 1].
+    """
+    if not type_match or not orientation_match:
+        return 0.0
+
+    exponent = (delta_dist / sigma_d) ** 2
+    if delta_clock is not None:
+        exponent += (delta_clock / sigma_c) ** 2
+    exponent += (delta_depth / sigma_depth) ** 2
+
+    return float(np.exp(-exponent))
+
+
+def compute_match_confidence(
+    best_cost: float,
+    second_best_cost: float | None,
+    candidate_count: int,
+    alpha: float = DEFAULT_ALPHA,
+    beta: float = DEFAULT_BETA,
+    gamma: float = DEFAULT_GAMMA,
+) -> tuple[float, str]:
+    """Sigmoid-based confidence using margin between best and second-best.
+
+    confidence = sigmoid(alpha * (-best_cost) + beta * margin - gamma * candidate_count)
+
+    Args:
+        best_cost: cost of the best match.
+        second_best_cost: cost of the second-best match (None if only one candidate).
+        candidate_count: total number of candidates considered.
+        alpha, beta, gamma: tunable sigmoid parameters.
+
+    Returns:
+        (confidence_value, confidence_label) where label is High/Medium/Low.
+    """
+    margin = (second_best_cost - best_cost) if second_best_cost is not None else 20.0
+
+    z = alpha * (-best_cost) + beta * margin - gamma * candidate_count
+    confidence = 1.0 / (1.0 + np.exp(-z))
+
+    if confidence >= 0.7:
+        label = "High"
+    elif confidence >= 0.4:
+        label = "Medium"
+    else:
+        label = "Low"
+
+    return round(float(confidence), 4), label
+
 
 # ---------------------------------------------------------------------------
 # Feature type compatibility
@@ -149,6 +236,7 @@ def _assign_segment(
     cost_thresh: float,
     weights: dict,
     segment_id: int,
+    enable_confidence: bool = False,
 ) -> tuple[list[dict], list[int], list[int]]:
     """Run Hungarian matching on one segment.
 
@@ -246,7 +334,14 @@ def _assign_segment(
 
         status = "UNCERTAIN" if cost > cost_thresh else "MATCHED"
 
-        matched.append({
+        # Depth delta for explainability
+        depth_a_val = row_a.get("depth_percent")
+        depth_b_val = row_b.get("depth_percent")
+        delta_depth = abs(depth_a_val - depth_b_val) if pd.notna(depth_a_val) and pd.notna(depth_b_val) else 0.0
+        delta_len = abs(row_a.get("length", 0) - row_b.get("length", 0)) if pd.notna(row_a.get("length")) and pd.notna(row_b.get("length")) else None
+        delta_wid = abs(row_a.get("width", 0) - row_b.get("width", 0)) if pd.notna(row_a.get("width")) and pd.notna(row_b.get("width")) else None
+
+        entry = {
             "feature_id_a": row_a["feature_id"],
             "feature_id_b": row_b["feature_id"],
             "index_a": anomalies_a.index[i],
@@ -258,6 +353,9 @@ def _assign_segment(
             "clock_deg_a": row_a.get("clock_deg"),
             "clock_deg_b": row_b.get("clock_deg"),
             "delta_clock_deg": round(delta_clock, 2) if delta_clock is not None else None,
+            "depth_delta_pct": round(delta_depth, 2),
+            "len_delta": round(delta_len, 2) if delta_len is not None else None,
+            "width_delta": round(delta_wid, 2) if delta_wid is not None else None,
             "feature_type": row_a["feature_type_norm"],
             "orientation": row_a.get("orientation"),
             "depth_pct_a": row_a.get("depth_percent"),
@@ -271,7 +369,37 @@ def _assign_segment(
             "cost": round(cost, 4),
             "segment_id": segment_id,
             "status": status,
-        })
+        }
+
+        if enable_confidence:
+            # Candidate count for this row
+            cand_count = len(candidates.get(i, []))
+            # Second-best cost
+            sorted_costs = sorted(c for _, c in candidates.get(i, []))
+            second_best = sorted_costs[1] if len(sorted_costs) > 1 else None
+
+            orient_ok = True
+            o_a = row_a.get("orientation")
+            o_b = row_b.get("orientation")
+            if isinstance(o_a, str) and isinstance(o_b, str):
+                orient_ok = o_a == o_b
+
+            prob = compute_match_probability(
+                delta_dist,
+                delta_clock,
+                delta_depth,
+                type_match=(row_a["feature_type_norm"] == row_b["feature_type_norm"]),
+                orientation_match=orient_ok,
+            )
+            conf_val, conf_label = compute_match_confidence(cost, second_best, cand_count)
+
+            entry["match_probability"] = round(prob, 4)
+            entry["match_confidence"] = conf_val
+            entry["confidence_label"] = conf_label
+            entry["margin"] = round(second_best - cost, 4) if second_best is not None else None
+            entry["candidate_count"] = cand_count
+
+        matched.append(entry)
 
     # Map back to original DataFrame indices
     unmatched_a_idx = [anomalies_a.index[i] for i in unmatched_a]
@@ -297,6 +425,7 @@ def match_anomalies(
     clock_tol: float = DEFAULT_CLOCK_TOL,
     cost_thresh: float = DEFAULT_COST_THRESH,
     weights: dict | None = None,
+    enable_confidence: bool = False,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Segment-wise anomaly matching with Hungarian assignment.
 
@@ -311,6 +440,8 @@ def match_anomalies(
         clock_tol: max clock difference in degrees.
         cost_thresh: cost above which a match is flagged UNCERTAIN.
         weights: cost function weight dict.
+        enable_confidence: if True, add match_probability, match_confidence,
+            confidence_label, margin, and candidate_count columns.
 
     Returns:
         (matched_df, missing_df, new_df)
@@ -355,6 +486,7 @@ def match_anomalies(
 
         matched, um_a, um_b = _assign_segment(
             seg_a, seg_b, dist_tol, clock_tol, cost_thresh, w, seg_idx,
+            enable_confidence=enable_confidence,
         )
         all_matched.extend(matched)
         all_unmatched_a.extend(um_a)

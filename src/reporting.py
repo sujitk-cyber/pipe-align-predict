@@ -199,6 +199,7 @@ def write_all_outputs(
     run_id_b: str,
     years_between: float,
     output_dir: Path,
+    html_report: bool = False,
 ) -> None:
     """Write all pipeline output files to output_dir.
 
@@ -209,6 +210,7 @@ def write_all_outputs(
         growth_summary.csv       – stats by feature type
         dig_list.csv             – top-50 most severe anomalies
         alignment_report.json    – full structured report
+        report.html              – interactive HTML report (if html_report=True)
     """
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -232,5 +234,23 @@ def write_all_outputs(
         summary_df=summary_df,
     )
     write_alignment_report(report, output_dir / "alignment_report.json")
+
+    if html_report:
+        try:
+            from .html_report import generate_html_report
+            generate_html_report(
+                growth_df=growth_df,
+                missing_df=missing_df,
+                new_df=new_df,
+                summary_df=summary_df,
+                segments=segments,
+                residuals=residuals,
+                run_id_a=run_id_a,
+                run_id_b=run_id_b,
+                years_between=years_between,
+                output_path=output_dir / "report.html",
+            )
+        except ImportError:
+            log.warning("plotly/jinja2 not installed — skipping HTML report")
 
     log.info("All outputs written to %s/", output_dir)
