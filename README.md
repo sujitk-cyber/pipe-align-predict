@@ -35,6 +35,44 @@ pip install -r requirements.txt
 | scikit-learn | DBSCAN clustering (optional) |
 | pytest | Testing |
 
+## Web Application
+
+WeldWarp includes a modern web interface for interactive analysis.
+
+### Prerequisites
+
+- **Backend**: Python 3.10+
+- **Frontend**: Node.js 18+
+
+### Running Locally
+
+1. **Start the Backend API**:
+
+   ```bash
+   cd web_backend
+   pip install -r requirements.txt
+   uvicorn main:app --reload
+   ```
+   Server runs at `http://127.0.0.1:8000`.
+
+2. **Start the Frontend UI**:
+
+   ```bash
+   cd web_frontend
+   npm install
+   npm run dev
+   ```
+   App runs at `http://localhost:3000`.
+
+### Features
+
+- **Upload Interface**: Drag-and-drop ILI files (Excel/CSV).
+- **Job Management**: Asynchronous pipeline execution.
+- **Results Dashboard**:
+    - Interactive matching statistics charts.
+    - Growth rate distributions.
+    - Top critical anomalies list.
+
 ## Usage
 
 ### Basic — Two Sheets from One Excel File
@@ -178,6 +216,8 @@ src/
   html_report.py         # HTML report with embedded charts
 tests/                   # Comprehensive pytest suite
 ili_alignment.py         # Legacy standalone implementation
+web_backend/             # FastAPI Backend
+web_frontend/            # Next.js Frontend
 ```
 
 ## License

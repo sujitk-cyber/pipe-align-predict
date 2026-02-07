@@ -10,6 +10,7 @@ from typing import List, Optional, Dict
 from datetime import datetime
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -242,3 +243,18 @@ async def get_job_status(job_id: str):
 async def list_jobs():
     """List all jobs."""
     return list(jobs_db.values())
+
+@app.get("/jobs/{job_id}/files/{filename}")
+async def get_job_file(job_id: str, filename: str):
+    """Serve a specific result file from a job's output directory."""
+    if job_id not in jobs_db:
+        raise HTTPException(404, "Job not found")
+    
+    job_dir = OUTPUT_DIR / job_id
+    file_path = job_dir / filename
+    
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(404, "File not found")
+        
+    return FileResponse(file_path, media_type="application/octet-stream", filename=filename)
+

@@ -10,7 +10,11 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 
-export function UploadForm() {
+interface UploadFormProps {
+    onUploadSuccess?: (files: string[]) => void
+}
+
+export function UploadForm({ onUploadSuccess }: UploadFormProps) {
     const [files, setFiles] = useState<FileList | null>(null)
     const [uploading, setUploading] = useState(false)
     const [status, setStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null)
@@ -27,12 +31,16 @@ export function UploadForm() {
         })
 
         try {
-            // Hardcoded localhost for MVP connection. In prod, use env var.
+            // Hardcoded localhost for MVP connection
             const response = await axios.post("http://localhost:8000/upload", formData, {
                 headers: { "Content-Type": "multipart/form-data" },
             })
-            setStatus({ type: 'success', message: `Successfully uploaded ${response.data.files.length} files.` })
-            // Note: File input value doesn't clear automatically, but state does
+            const uploadedFiles = response.data.files
+            setStatus({ type: 'success', message: `Successfully uploaded ${uploadedFiles.length} files.` })
+
+            if (onUploadSuccess) {
+                onUploadSuccess(uploadedFiles)
+            }
         } catch (error: any) {
             setStatus({ type: 'error', message: error.response?.data?.detail || "Upload failed. Check backend connection." })
         } finally {
