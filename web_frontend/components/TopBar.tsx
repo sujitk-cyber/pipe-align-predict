@@ -32,6 +32,7 @@ export function TopBar() {
 
   let pageTitle = "Upload & Analyze"
   if (pathname === "/jobs") pageTitle = "Job History"
+  if (pathname === "/settings") pageTitle = "Settings"
   if (currentJobId) {
     pageTitle = "Job Results Overview"
     if (pathname.endsWith("/matches")) pageTitle = "Matching Review"
