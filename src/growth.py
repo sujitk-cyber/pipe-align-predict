@@ -297,10 +297,10 @@ def forecast_depth(
     )
     df["forecast_years"] = forecast_years
 
-    n_above_80 = (df["projected_depth_pct"] >= 80).sum()
+    n_above_80 = (df["projected_depth_pct"] >= DEFAULT_CRITICAL_DEPTH_PCT).sum()
     log.info(
-        "Forecast (%d yr): %d anomalies projected to reach >= 80%% WT",
-        forecast_years, n_above_80,
+        "Forecast (%d yr): %d anomalies projected to reach >= %.0f%% WT",
+        forecast_years, n_above_80, DEFAULT_CRITICAL_DEPTH_PCT,
     )
 
     return df

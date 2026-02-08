@@ -54,9 +54,17 @@ const config = {
                 },
             },
             borderRadius: {
+                "3xl": "1.5rem",
+                "2xl": "1.25rem",
+                xl: "1rem",
                 lg: "var(--radius)",
-                md: "calc(var(--radius) - 2px)",
-                sm: "calc(var(--radius) - 4px)",
+                md: "calc(var(--radius) - 4px)",
+                sm: "calc(var(--radius) - 8px)",
+            },
+            boxShadow: {
+                glass: "0 8px 32px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.7)",
+                "glass-lg": "0 16px 64px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.7)",
+                "glass-sm": "0 2px 8px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.5)",
             },
             keyframes: {
                 "accordion-down": {
@@ -67,10 +75,15 @@ const config = {
                     from: { height: "var(--radix-accordion-content-height)" },
                     to: { height: "0" },
                 },
+                "shimmer": {
+                    "0%": { backgroundPosition: "-200% 0" },
+                    "100%": { backgroundPosition: "200% 0" },
+                },
             },
             animation: {
                 "accordion-down": "accordion-down 0.2s ease-out",
                 "accordion-up": "accordion-up 0.2s ease-out",
+                "shimmer": "shimmer 2s ease-in-out infinite",
             },
         },
     },
