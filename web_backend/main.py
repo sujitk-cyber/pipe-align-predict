@@ -285,7 +285,9 @@ class RoleUpdate(BaseModel):
 
 @app.put("/admin/users/role")
 async def admin_set_role(update: RoleUpdate, user: UserInfo = Depends(require_role("admin"))):
-    """Update a user's role (admin only)."""
+    """Update a user's role (admin only). Cannot change own role."""
+    if update.email == user.email:
+        raise HTTPException(400, "You cannot change your own role")
     try:
         updated = set_user_role(update.email, update.role)
         return updated

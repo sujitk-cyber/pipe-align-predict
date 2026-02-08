@@ -3,9 +3,10 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import api from "@/lib/api"
-import { Play, Loader2, AlertTriangle, FileText } from "lucide-react"
+import { Play, Loader2, AlertTriangle, FileText, ShieldAlert } from "lucide-react"
 
 import { UploadForm } from "@/components/UploadForm"
+import { useImpersonate } from "@/lib/impersonate"
 import { Button } from "@/components/ui/button"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card"
 import { Select } from "@/components/ui/select"
@@ -13,6 +14,9 @@ import { Label } from "@/components/ui/label"
 
 export default function Home() {
   const router = useRouter()
+  const { impersonatedRole } = useImpersonate()
+  const effectiveRole = impersonatedRole || "admin"
+  const canUpload = effectiveRole === "admin" || effectiveRole === "engineer"
   const [uploadedFiles, setUploadedFiles] = useState<string[]>([])
   const [jobId, setJobId] = useState<string | null>(null)
   const [jobStatus, setJobStatus] = useState<string | null>(null)
@@ -129,10 +133,19 @@ export default function Home() {
           <p className="text-muted-foreground text-sm">Upload ILI run data to start a new alignment and growth analysis.</p>
         </header>
 
+        {!canUpload && (
+          <div className="flex items-center gap-3 glass rounded-xl p-4 border border-amber-500/30">
+            <ShieldAlert className="h-5 w-5 text-amber-400 shrink-0" />
+            <p className="text-sm text-amber-300">
+              <strong>Viewer role</strong> — You can browse existing results but cannot upload files or run analyses.
+            </p>
+          </div>
+        )}
+
         {/* Step 1: Upload */}
         <section aria-label="Upload data files">
           <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground/70 mb-4">1. Upload Data</h2>
-          <div className={jobId ? "opacity-50 pointer-events-none" : ""}>
+          <div className={jobId ? "opacity-50 pointer-events-none" : !canUpload ? "opacity-40 pointer-events-none" : ""}>
             <UploadForm onUploadSuccess={setUploadedFiles} />
           </div>
         </section>
