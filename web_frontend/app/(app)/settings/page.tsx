@@ -3,8 +3,9 @@
 import { useSession } from "next-auth/react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { useState } from "react"
-import { User, Shield, Mail, UserCircle, Loader2, Check } from "lucide-react"
+import { User, Shield, Mail, UserCircle, Loader2, Check, Eye, EyeOff } from "lucide-react"
 import api from "@/lib/api"
+import { useImpersonate } from "@/lib/impersonate"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Select } from "@/components/ui/select"
@@ -50,7 +51,9 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState<string | null>(null)
 
   const user = session?.user
-  const isAdmin = (user as any)?.role === "admin"
+  const realRole = (user as any)?.role || "viewer"
+  const isAdmin = realRole === "admin"
+  const { impersonatedRole, setImpersonatedRole, isImpersonating } = useImpersonate()
 
   const { data: currentUser } = useQuery({
     queryKey: ["/me"],
@@ -75,8 +78,12 @@ export default function SettingsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/admin/users"] })
+      queryClient.invalidateQueries({ queryKey: ["/me"] })
       setSaving(null)
       setRoleUpdates({})
+    },
+    onError: () => {
+      setSaving(null)
     },
   })
 
@@ -136,6 +143,50 @@ export default function SettingsPage() {
       </Card>
 
       {isAdmin && (
+        <Card className={isImpersonating ? "ring-2 ring-amber-500/50" : ""}>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Eye className="h-5 w-5" />
+              Role Preview
+            </CardTitle>
+            <CardDescription>
+              Temporarily experience the app as a different role. Your actual role stays Admin.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-4">
+              <Select
+                value={impersonatedRole || ""}
+                onChange={(e) => setImpersonatedRole(e.target.value || null)}
+                className="w-48"
+              >
+                <option value="">Admin (actual role)</option>
+                <option value="engineer">Preview as Engineer</option>
+                <option value="viewer">Preview as Viewer</option>
+              </Select>
+              {isImpersonating && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setImpersonatedRole(null)}
+                  className="gap-1.5"
+                >
+                  <EyeOff className="h-3.5 w-3.5" />
+                  Stop Preview
+                </Button>
+              )}
+            </div>
+            {isImpersonating && (
+              <p className="text-xs text-amber-400 mt-3">
+                Previewing as <strong>{roleLabel(impersonatedRole!)}</strong> — 
+                API requests and UI permissions reflect this role. Upload/run actions may be blocked.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {isAdmin && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -152,6 +203,7 @@ export default function SettingsPage() {
             ) : (
               <div className="space-y-3">
                 {allUsers.map((u) => {
+                  const isSelf = u.email === user?.email
                   const pendingRole = roleUpdates[u.email]
                   const displayRole = pendingRole || u.role
                   const hasChanges = pendingRole && pendingRole !== u.role
@@ -172,31 +224,44 @@ export default function SettingsPage() {
                           </div>
                         )}
                         <div className="min-w-0 flex-1">
-                          <p className="font-medium truncate">{u.name || "User"}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium truncate">{u.name || "User"}</p>
+                            {isSelf && (
+                              <span className="text-[10px] text-muted-foreground/60 font-medium">(you)</span>
+                            )}
+                          </div>
                           <p className="text-sm text-muted-foreground truncate">{u.email}</p>
                         </div>
                         <div className="flex items-center gap-3 shrink-0">
-                          <Select
-                            value={displayRole}
-                            onChange={(e) => handleRoleChange(u.email, e.target.value)}
-                            className="w-32"
-                          >
-                            <option value="viewer">Viewer</option>
-                            <option value="engineer">Engineer</option>
-                            <option value="admin">Admin</option>
-                          </Select>
-                          {hasChanges && (
-                            <Button
-                              size="sm"
-                              onClick={() => handleSaveRole(u.email)}
-                              disabled={saving === u.email}
-                            >
-                              {saving === u.email ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              ) : (
-                                <Check className="h-3.5 w-3.5" />
+                          {isSelf ? (
+                            <Badge className={`${roleColor(u.role)} border`}>
+                              {roleLabel(u.role)}
+                            </Badge>
+                          ) : (
+                            <>
+                              <Select
+                                value={displayRole}
+                                onChange={(e) => handleRoleChange(u.email, e.target.value)}
+                                className="w-32"
+                              >
+                                <option value="viewer">Viewer</option>
+                                <option value="engineer">Engineer</option>
+                                <option value="admin">Admin</option>
+                              </Select>
+                              {hasChanges && (
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleSaveRole(u.email)}
+                                  disabled={saving === u.email}
+                                >
+                                  {saving === u.email ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    <Check className="h-3.5 w-3.5" />
+                                  )}
+                                </Button>
                               )}
-                            </Button>
+                            </>
                           )}
                         </div>
                       </div>

@@ -6,8 +6,9 @@ import { useSession, signOut } from "next-auth/react"
 import { cn } from "@/lib/utils"
 import {
   Upload, BarChart3, TableProperties, TrendingUp,
-  History, Settings, ChevronRight, LogOut,
+  History, Settings, ChevronRight, LogOut, Eye,
 } from "lucide-react"
+import { useImpersonate } from "@/lib/impersonate"
 
 interface NavItem {
   label: string
@@ -40,7 +41,8 @@ export function Sidebar() {
   const currentJobId = jobMatch ? jobMatch[1] : null
 
   const user = session?.user
-  const role = (user as any)?.role || "viewer"
+  const { impersonatedRole, isImpersonating } = useImpersonate()
+  const role = impersonatedRole || (user as any)?.role || "viewer"
 
   const mainNav: { title: string; items: NavItem[] }[] = [
     {
@@ -157,7 +159,10 @@ export function Sidebar() {
           )}
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium leading-none truncate">{user?.name || "User"}</p>
-            <p className="text-[11px] text-primary/70 mt-0.5 capitalize">{roleLabel(role)}</p>
+            <p className={cn("text-[11px] mt-0.5 capitalize", isImpersonating ? "text-amber-400" : "text-primary/70")}>
+              {isImpersonating && <Eye className="inline h-3 w-3 mr-1 -mt-0.5" />}
+              {roleLabel(role)}
+            </p>
           </div>
           <button
             onClick={() => signOut({ callbackUrl: "/login" })}
