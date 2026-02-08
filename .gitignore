@@ -27,8 +27,11 @@ node_modules/
 __pycache__/
 *.pyc
 
-# Auth user store
+# Auth user store & runtime data
 web_backend/users.json
+web_backend/jobs.json
+web_backend/uploads/
+web_backend/outputs/
 
 # Pipeline output files & data
 outputs/
