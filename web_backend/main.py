@@ -601,12 +601,17 @@ async def get_risk_segments(job_id: str, top_n: int = Query(20, ge=1, le=100)):
             return "MEDIUM RISK"
         return "LOW RISK"
 
+    def _safe_str(val):
+        if val is None or (isinstance(val, float) and (math.isnan(val) or math.isinf(val))):
+            return None
+        return str(val)
+
     results = []
     for _, row in df.iterrows():
         results.append({
             "rank": int(row.get("rank", 0)),
-            "feature_id": row.get("feature_id_a"),
-            "feature_type": row.get("feature_type"),
+            "feature_id": _safe_str(row.get("feature_id_a")),
+            "feature_type": _safe_str(row.get("feature_type")),
             "odometer": _safe_float(row.get("distance_a"), 2),
             "growth_rate": _safe_float(row.get("depth_growth_pct_per_yr"), 4),
             "depth": _safe_float(row.get("depth_pct_b"), 2),

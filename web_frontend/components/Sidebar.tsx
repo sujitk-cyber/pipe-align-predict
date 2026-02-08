@@ -54,7 +54,7 @@ export function Sidebar() {
       title: "System",
       items: [
         { label: "Job History", href: "/jobs", icon: History },
-        { label: "Settings", href: "#", icon: Settings, disabled: true },
+        { label: "Settings", href: "/settings", icon: Settings },
       ],
     },
   ]
