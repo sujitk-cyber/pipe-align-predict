@@ -79,6 +79,38 @@ MAPPING_CONFIGS = {
         "width": ["width_[in]"],
         "wall_thickness": ["wt_[in]"],
     },
+    "generic": {
+        "feature_id": ["feature_id", "anomaly_id", "id", "j._no.", "joint_number"],
+        "distance": [
+            "distance", "log_dist", "log_dist._[ft]", "log_distance",
+            "odometer", "ili_wheel_count_[ft.]", "chainage", "chainage_[ft]",
+            "log_dist._[ft]", "log_distance_[ft]",
+        ],
+        "joint_number": ["joint_number", "j._no.", "joint_no", "jt_no"],
+        "relative_position": [
+            "relative_position", "to_u/s_w._[ft]", "distance_to_u/s_gw_[ft]",
+            "to_upstream_weld", "rel_pos",
+        ],
+        "clock_position_raw": [
+            "clock_position", "o'clock", "o'clock_[hh:mm]", "clock",
+            "oclock", "clock_pos",
+        ],
+        "feature_type_raw": [
+            "feature_type", "event", "event_description", "anomaly_type",
+            "description", "type",
+        ],
+        "orientation": ["orientation", "id/od", "internal", "surface"],
+        "depth_percent": [
+            "depth_percent", "depth_[%]", "depth_%", "metal_loss_depth_[%]",
+            "depth_pct", "depth",
+        ],
+        "length": ["length", "length_[in]", "length_[in.]", "axial_length"],
+        "width": ["width", "width_[in]", "width_[in.]", "circ_width"],
+        "wall_thickness": [
+            "wall_thickness", "wt_[in]", "t_[in]", "wt", "nominal_wt",
+            "wall_thickness_[in]",
+        ],
+    },
 }
 
 
@@ -107,12 +139,17 @@ def auto_detect_mapping(df: pd.DataFrame) -> tuple[str, dict]:
 
     Returns (config_name, resolved_mapping) where resolved_mapping is
     {canonical_name: actual_column_name}.
+
+    Tries vendor-specific configs first, then falls back to the generic
+    config which has broad column-name coverage.  If even the generic
+    config scores poorly, a fuzzy substring search is attempted on key
+    columns (distance, depth, clock).
     """
     norm_cols = [_normalise_col_name(c) for c in df.columns]
 
     best_name = None
     best_score = -1
-    best_resolved = {}
+    best_resolved: dict[str, str] = {}
 
     for cfg_name, cfg in MAPPING_CONFIGS.items():
         score = _score_mapping(norm_cols, cfg)
@@ -120,21 +157,56 @@ def auto_detect_mapping(df: pd.DataFrame) -> tuple[str, dict]:
             best_score = score
             best_name = cfg_name
             # Build resolved mapping
-            resolved = {}
+            resolved: dict[str, str] = {}
             for canonical, candidates in cfg.items():
                 for cand in candidates:
                     if cand in norm_cols:
-                        # Map back to original column name
                         idx = norm_cols.index(cand)
                         resolved[canonical] = df.columns[idx]
                         break
             best_resolved = resolved
 
+    # If best score is very low, try fuzzy substring matching as last resort
+    if best_score <= 2 and "distance" not in best_resolved:
+        log.info("Low auto-detect score (%d); attempting fuzzy column matching", best_score)
+        fuzzy_resolved = _fuzzy_match_columns(df.columns.tolist(), norm_cols)
+        if "distance" in fuzzy_resolved:
+            fuzzy_score = len(fuzzy_resolved)
+            if fuzzy_score > best_score:
+                best_name = "fuzzy"
+                best_score = fuzzy_score
+                best_resolved = fuzzy_resolved
+
     log.info(
         "Auto-detected mapping config '%s' (score %d/%d)",
-        best_name, best_score, len(MAPPING_CONFIGS.get(best_name, {})),
+        best_name, best_score, len(MAPPING_CONFIGS.get(best_name, {})) if best_name in MAPPING_CONFIGS else best_score,
     )
     return best_name, best_resolved
+
+
+def _fuzzy_match_columns(
+    raw_cols: list[str], norm_cols: list[str]
+) -> dict[str, str]:
+    """Fuzzy substring matching for common canonical columns."""
+    FUZZY_PATTERNS: dict[str, list[str]] = {
+        "distance": ["dist", "odometer", "chainage", "wheel_count"],
+        "depth_percent": ["depth", "metal_loss_depth"],
+        "clock_position_raw": ["clock", "o'clock", "oclock"],
+        "feature_type_raw": ["event", "description", "feature_type", "anomaly_type"],
+        "orientation": ["id/od", "internal", "orientation", "surface"],
+        "length": ["length", "axial"],
+        "width": ["width", "circ"],
+        "wall_thickness": ["wall", "wt_", "t_[in"],
+        "feature_id": ["joint", "j._no", "feature_id", "anomaly_id"],
+    }
+    resolved: dict[str, str] = {}
+    for canonical, patterns in FUZZY_PATTERNS.items():
+        for i, nc in enumerate(norm_cols):
+            for pat in patterns:
+                if pat in nc and canonical not in resolved:
+                    resolved[canonical] = raw_cols[i]
+                    break
+    return resolved
 
 
 # ---------------------------------------------------------------------------
@@ -192,8 +264,12 @@ def build_canonical(
     if raw_dist_col and raw_dist_col in df.columns:
         out["distance"] = _safe_numeric(df[raw_dist_col])
     else:
-        log.error("No distance column found for run %s", run_id)
-        sys.exit(1)
+        msg = (
+            f"No distance column found for run {run_id}. "
+            f"Available columns: {list(df.columns)}"
+        )
+        log.error(msg)
+        raise ValueError(msg)
 
     # Joint number
     raw_jn_col = mapping.get("joint_number")
@@ -314,8 +390,7 @@ def load_run(
     with keys: config_name, resolved_mapping (for the alignment report).
     """
     if not os.path.isfile(path):
-        log.error("File not found: %s", path)
-        sys.exit(1)
+        raise FileNotFoundError(f"File not found: {path}")
 
     raw = read_file(path, sheet_name=sheet_name)
     log.info("Run %s: read %d rows from %s (sheet=%s)", run_id, len(raw), path, sheet_name)

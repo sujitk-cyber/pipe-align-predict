@@ -4,73 +4,244 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-
+    --background: 220 20% 97%;
+    --foreground: 220 25% 10%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
- 
+    --card-foreground: 220 25% 10%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
- 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
- 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
- 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
- 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
- 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --popover-foreground: 220 25% 10%;
+    --primary: 215 90% 52%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 14% 92%;
+    --secondary-foreground: 220 25% 15%;
+    --muted: 220 14% 92%;
+    --muted-foreground: 220 10% 42%;
+    --accent: 215 90% 52%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 13% 88%;
+    --input: 220 13% 88%;
+    --ring: 215 90% 52%;
+    --radius: 1rem;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
- 
-    --radius: 0.5rem;
+    --glass-bg: rgba(255, 255, 255, 0.55);
+    --glass-bg-heavy: rgba(255, 255, 255, 0.72);
+    --glass-border: rgba(255, 255, 255, 0.35);
+    --glass-border-subtle: rgba(255, 255, 255, 0.18);
+    --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
+    --glass-shadow-lg: 0 16px 64px rgba(0, 0, 0, 0.08);
+    --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    --glass-blur: 20px;
+    --glass-saturate: 1.8;
   }
- 
+
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
- 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
- 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
- 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
- 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
- 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
- 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
- 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
- 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    --background: 228 18% 4%;
+    --foreground: 220 20% 92%;
+
+    --card: 228 18% 6%;
+    --card-foreground: 220 20% 92%;
+
+    --popover: 228 18% 6%;
+    --popover-foreground: 220 20% 92%;
+
+    --primary: 215 100% 65%;
+    --primary-foreground: 228 18% 4%;
+
+    --secondary: 228 15% 11%;
+    --secondary-foreground: 220 20% 88%;
+
+    --muted: 228 15% 11%;
+    --muted-foreground: 220 12% 55%;
+
+    --accent: 215 100% 65%;
+    --accent-foreground: 228 18% 4%;
+
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 228 15% 12%;
+    --input: 228 15% 12%;
+    --ring: 215 100% 65%;
+
+    --glass-bg: rgba(12, 14, 24, 0.60);
+    --glass-bg-heavy: rgba(12, 14, 24, 0.80);
+    --glass-border: rgba(255, 255, 255, 0.06);
+    --glass-border-subtle: rgba(255, 255, 255, 0.03);
+    --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.30);
+    --glass-shadow-lg: 0 16px 64px rgba(0, 0, 0, 0.40);
+    --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.04);
   }
-}
- 
-@layer base {
+
   * {
     @apply border-border;
   }
+
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
+}
+
+/* ── Mesh gradient background (dark night) ────────────────── */
+
+.mesh-bg {
+  background-color: hsl(var(--background));
+}
+
+.dark .mesh-bg {
+  background-color: hsl(228, 18%, 4%);
+  background-image:
+    radial-gradient(at 0% 0%, hsla(215, 100%, 60%, 0.08) 0px, transparent 55%),
+    radial-gradient(at 100% 0%, hsla(280, 80%, 55%, 0.06) 0px, transparent 50%),
+    radial-gradient(at 70% 100%, hsla(195, 90%, 50%, 0.05) 0px, transparent 50%),
+    radial-gradient(at 15% 85%, hsla(330, 70%, 50%, 0.04) 0px, transparent 55%),
+    radial-gradient(at 50% 50%, hsla(215, 50%, 15%, 0.20) 0px, transparent 70%);
+}
+
+/* cursor glow handled by canvas component */
+
+/* ── Liquid Glass primitives (dark-tuned) ─────────────────── */
+
+@layer components {
+  .glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+    border: 1px solid var(--glass-border);
+    box-shadow:
+      var(--glass-shadow),
+      var(--glass-highlight);
+    transition: box-shadow 0.3s ease, background 0.3s ease;
+  }
+
+  .glass:hover {
+    box-shadow:
+      var(--glass-shadow-lg),
+      var(--glass-highlight);
+  }
+
+  .glass-heavy {
+    background: var(--glass-bg-heavy);
+    backdrop-filter: blur(24px) saturate(2);
+    -webkit-backdrop-filter: blur(24px) saturate(2);
+    border: 1px solid var(--glass-border);
+    box-shadow:
+      var(--glass-shadow),
+      var(--glass-highlight);
+  }
+
+  .glass-card {
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+    border: 1px solid var(--glass-border);
+    box-shadow:
+      var(--glass-shadow),
+      var(--glass-highlight);
+    transition: box-shadow 0.3s ease, transform 0.3s ease;
+  }
+
+  .glass-card:hover {
+    box-shadow:
+      var(--glass-shadow-lg),
+      var(--glass-highlight),
+      0 0 20px hsla(215, 100%, 65%, 0.04);
+    transform: translateY(-1px);
+  }
+
+  .glass-sidebar {
+    background: var(--glass-bg-heavy);
+    backdrop-filter: blur(32px) saturate(2);
+    -webkit-backdrop-filter: blur(32px) saturate(2);
+    border-right: 1px solid var(--glass-border);
+    box-shadow:
+      4px 0 32px rgba(0, 0, 0, 0.15),
+      var(--glass-highlight);
+  }
+
+  .glass-input {
+    background: var(--glass-bg);
+    backdrop-filter: blur(8px) saturate(1.5);
+    -webkit-backdrop-filter: blur(8px) saturate(1.5);
+    border: 1px solid var(--glass-border);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.15), var(--glass-highlight);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    color: hsl(var(--foreground));
+    color-scheme: dark;
+  }
+
+  /* Hide native file input, use custom dropzone instead */
+  .file-input-hidden {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    z-index: 2;
+  }
+
+  .glass-input:focus {
+    border-color: hsl(var(--primary) / 0.4);
+    box-shadow:
+      0 0 0 3px hsl(var(--primary) / 0.08),
+      0 0 20px hsl(var(--primary) / 0.06),
+      inset 0 1px 2px rgba(0, 0, 0, 0.15),
+      var(--glass-highlight);
+  }
+
+  .glass-shine {
+    position: relative;
+    overflow: hidden;
+  }
+  .glass-shine::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -75%;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.06),
+      transparent
+    );
+    transform: skewX(-25deg);
+    transition: left 0.6s ease;
+    pointer-events: none;
+    z-index: 1;
+  }
+  .glass-shine:hover::before {
+    left: 125%;
+  }
+}
+
+/* ── Scrollbar (dark) ─────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.15);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.25);
+}
+
+/* ── Selection highlight ──────────────────────────────────── */
+
+::selection {
+  background: hsl(var(--primary) / 0.25);
+  color: hsl(var(--foreground));
 }

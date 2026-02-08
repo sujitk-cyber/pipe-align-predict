@@ -14,16 +14,19 @@ log = logging.getLogger(__name__)
 
 def _serialise(obj):
     """JSON serialiser for numpy/pandas types."""
+    # Check NaN first before any type conversion
+    if pd.isna(obj):
+        return None
     if isinstance(obj, (np.integer,)):
         return int(obj)
     if isinstance(obj, (np.floating,)):
+        if np.isnan(obj):
+            return None
         return float(obj)
     if isinstance(obj, (np.bool_,)):
         return bool(obj)
     if isinstance(obj, np.ndarray):
         return obj.tolist()
-    if pd.isna(obj):
-        return None
     raise TypeError(f"Not serialisable: {type(obj)}")
 
 
@@ -149,7 +152,13 @@ def build_alignment_report(
 
     # Summary by feature type
     if not summary_df.empty:
-        report["growth_by_feature_type"] = summary_df.to_dict(orient="records")
+        # Convert NaN to None for valid JSON
+        records = summary_df.to_dict(orient="records")
+        for rec in records:
+            for k, v in rec.items():
+                if isinstance(v, float) and (pd.isna(v) or np.isnan(v)):
+                    rec[k] = None
+        report["growth_by_feature_type"] = records
 
     # Top 10 most severe
     if not growth_df.empty and "severity_score" in growth_df.columns:
@@ -178,8 +187,15 @@ def build_alignment_report(
 
 def write_alignment_report(report: dict, path: Path) -> None:
     """Write alignment report as JSON."""
+    # First dump to string, then replace NaN/Infinity with null
+    import re
+    json_str = json.dumps(report, indent=2, default=_serialise)
+    # Replace NaN and Infinity with null (case-sensitive, word boundary)
+    json_str = re.sub(r'\bNaN\b', 'null', json_str)
+    json_str = re.sub(r'\bInfinity\b', 'null', json_str)
+    json_str = re.sub(r'\b-Infinity\b', 'null', json_str)
     with open(path, "w") as f:
-        json.dump(report, f, indent=2, default=_serialise)
+        f.write(json_str)
     log.info("Wrote alignment report to %s", path)
 
 

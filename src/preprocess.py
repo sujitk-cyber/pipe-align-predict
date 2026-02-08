@@ -117,12 +117,12 @@ FEATURE_TYPE_MAP = {
 # Feature types that represent fixed pipeline features (control points)
 CONTROL_POINT_TYPES = {"girth_weld", "valve", "tee", "tap", "flange", "bend"}
 
-# Feature types that are compatible for matching across runs
-COMPATIBLE_TYPES = {
-    "metal_loss": {"metal_loss"},
-    "dent": {"dent"},
-    "manufacturing_anomaly": {"manufacturing_anomaly"},
-    "girth_weld_anomaly": {"girth_weld_anomaly"},
+# Feature types that are compatible for matching across runs.
+# Same-type always matches (handled in types_compatible fallback).
+# This map only needs to list *cross-type* compatibility.
+COMPATIBLE_TYPES: dict[str, set[str]] = {
+    "metal_loss": {"metal_loss", "cluster"},
+    "cluster": {"metal_loss", "cluster"},
 }
 
 
