@@ -162,8 +162,8 @@ class TestAIC_BIC:
         assert compute_bic(10, 2, 1.0) < compute_bic(10, 5, 1.0)
 
     def test_edge_cases(self):
-        assert compute_aic(0, 2, 1.0) == np.inf
-        assert compute_bic(10, 2, 0.0) == np.inf
+        assert compute_aic(0, 2, 1.0) == np.inf    # invalid n → inf
+        assert compute_bic(10, 2, 0.0) == -np.inf  # perfect fit → -inf (best)
 
 
 class TestDetectAcceleration:

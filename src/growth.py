@@ -431,8 +431,10 @@ def compute_aic(n: int, k: int, rss: float) -> float:
 
     AIC = n * ln(RSS/n) + 2*k
     """
-    if n <= 0 or rss <= 0:
+    if n <= 0:
         return np.inf
+    if rss <= 0:
+        return -np.inf  # perfect fit — best possible score
     return n * np.log(rss / n) + 2 * k
 
 
@@ -441,8 +443,10 @@ def compute_bic(n: int, k: int, rss: float) -> float:
 
     BIC = n * ln(RSS/n) + k * ln(n)
     """
-    if n <= 0 or rss <= 0:
+    if n <= 0:
         return np.inf
+    if rss <= 0:
+        return -np.inf  # perfect fit — best possible score
     return n * np.log(rss / n) + k * np.log(n)
 
 
