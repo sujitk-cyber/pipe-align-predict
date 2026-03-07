@@ -25,6 +25,10 @@ api.interceptors.request.use(async (config) => {
     if (session?.user) {
       config.headers["X-User-Email"] = session.user.email || ""
       config.headers["X-User-Role"] = _impersonatedRole || (session.user as any)?.role || "viewer"
+    } else if (typeof document !== "undefined" && document.cookie.includes("ww-demo=1")) {
+      // Demo-mode: use a known admin account so API calls work
+      config.headers["X-User-Email"] = "admin@weldwarp.com"
+      config.headers["X-User-Role"] = _impersonatedRole || "admin"
     }
   } catch {
     // proceed without auth headers
