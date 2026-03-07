@@ -103,9 +103,7 @@ async def run_pipeline_task(job_id: str, config: PipelineConfig):
     save_jobs()
     
     # Construct command
-    # Use the venv Python explicitly to avoid bytecode cache issues
-    venv_python = Path(__file__).parent.parent / "venv" / "bin" / "python"
-    cmd = [str(venv_python), "run_pipeline.py"]
+    cmd = [sys.executable, "run_pipeline.py"]
     
     # Inputs: Just take the first 2 files for now logic, or --runs for multirun
     # The current CLI supports 2 files as positional args OR multirun logic.
